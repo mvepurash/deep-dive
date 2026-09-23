@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>Глубокое погружение — прототип ущелья</title>
+  <style>
+    html, body {
+      margin: 0; padding: 0; height: 100%;
+      background: #000; overflow: hidden;
+      -webkit-tap-highlight-color: transparent;
+      touch-action: none;
+      font-family: sans-serif;
+    }
+    #wrap {
+      height: 100%; display: flex;
+      align-items: center; justify-content: center;
+    }
+    #game-canvas {
+      aspect-ratio: 480 / 854;
+      max-width: 100%; max-height: 100%;
+      display: block; background: #0c1e30;
+      touch-action: none;
+    }
+  </style>
+</head>
+<body>
+  <div id="wrap">
+    <canvas id="game-canvas"></canvas>
+  </div>
+
+  <script src="js/config.js"></script>
+  <script src="js/canyon.js"></script>
+  <script src="js/drone.js"></script>
+  <script src="js/game.js"></script>
+</body>
+</html>
