@@ -48,8 +48,10 @@ const Game = (() => {
 
     canvas.addEventListener('touchstart', e => { e.preventDefault(); move(e.touches[0].clientX); }, { passive: false });
     canvas.addEventListener('touchmove',  e => { e.preventDefault(); move(e.touches[0].clientX); }, { passive: false });
-    canvas.addEventListener('mousemove',  e => move(e.clientX));
-    canvas.addEventListener('mousedown',  e => move(e.clientX));
+
+    // Мышь слушаем на ВСЁМ окне, а не только над холстом: иначе управление
+    // пропадает, стоит курсору выйти за край, и это читается как «не реагирует»
+    window.addEventListener('mousemove', e => move(e.clientX));
 
     // Клавиатура — для удобства отладки на компьютере
     document.addEventListener('keydown', e => {

@@ -24,15 +24,15 @@ const Drone = (() => {
   function update(dt) {
     if (!alive) return;
 
-    // Тянемся к цели с ускорением, а не мгновенно
+    // Желаемая скорость: пропорциональна расстоянию до цели, но с потолком.
+    // Раньше от расстояния зависело УСКОРЕНИЕ — из-за этого на малых
+    // смещениях дрон почти не реагировал и казался неуправляемым.
     const dx = targetX - x;
-    vx += Math.sign(dx) * Math.min(Math.abs(dx) * 12, CONFIG.DRONE_ACCEL) * dt;
+    let desired = dx * CONFIG.DRONE_RESPONSE;
+    desired = Math.max(-CONFIG.DRONE_MAX_SPEED, Math.min(CONFIG.DRONE_MAX_SPEED, desired));
 
-    // Сопротивление воды — гасит скорость, даёт «тяжесть»
-    vx -= vx * CONFIG.DRONE_DAMPING * dt;
-
-    // Предел скорости
-    vx = Math.max(-CONFIG.DRONE_MAX_SPEED, Math.min(CONFIG.DRONE_MAX_SPEED, vx));
+    // Тянемся к желаемой скорости с ограниченным темпом — это и есть «масса»
+    vx += (desired - vx) * Math.min(1, CONFIG.DRONE_ACCEL_RATE * dt);
 
     x += vx * dt;
 
