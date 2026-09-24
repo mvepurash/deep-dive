@@ -75,7 +75,7 @@ const Game = (() => {
     const droneDepth = depth + (CONFIG.DRONE_Y / PX_PER_M);
     const w = Canyon.getWalls(droneDepth);
     const r = CONFIG.DRONE_RADIUS;
-    if (Drone.x - r < w.left || Drone.x + r > w.right) {
+    if (Drone.x - r < w.hitLeft || Drone.x + r > w.hitRight) {
       _crash();
     }
   }
@@ -107,6 +107,15 @@ const Game = (() => {
       const w = Canyon.getWalls(d);
       ctx.fillRect(0, py, w.left, STEP);
       ctx.fillRect(w.right, py, CONFIG.CANVAS_W - w.right, STEP);
+    }
+
+    // Наросты на стенах — пока просто выступы другого цвета
+    ctx.fillStyle = '#2d5a3a';
+    for (let py = 0; py <= CONFIG.CANVAS_H; py += STEP) {
+      const d = depth + py / PX_PER_M;
+      const w = Canyon.getWalls(d);
+      if (w.growL > 0.5) ctx.fillRect(w.left, py, w.growL, STEP);
+      if (w.growR > 0.5) ctx.fillRect(w.right - w.growR, py, w.growR, STEP);
     }
 
     // Контур прохода
@@ -162,7 +171,8 @@ const Game = (() => {
     ctx.fillText(names[w.phase], 10, CONFIG.CANVAS_H - 58);
     ctx.fillStyle = '#7fb0d4';
     ctx.fillText(sides[w.side], 10, CONFIG.CANVAS_H - 42);
-    ctx.fillText('проход ' + Math.round(w.width) + 'px', 10, CONFIG.CANVAS_H - 26);
+    const eff = Math.round(w.hitRight - w.hitLeft);
+    ctx.fillText('проход ' + Math.round(w.width) + 'px  чистый ' + eff + 'px', 10, CONFIG.CANVAS_H - 26);
     ctx.fillText('падение ' + Math.round(fallSpeed) + ' м/с', 10, CONFIG.CANVAS_H - 10);
   }
 

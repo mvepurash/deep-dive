@@ -93,22 +93,39 @@ const Canyon = (() => {
 
   // Границы прохода на глубине d.
   // Асимметрия: при давлении слева правая стена стоит на месте и наоборот.
+  //
+  // Ширина считается с учётом наростов: если они съедают место, ущелье
+  // раздвигается, чтобы ЭФФЕКТИВНЫЙ проход остался обещанным. Без этого
+  // заявленные 120px превращались бы в 70px и проход становился невозможным.
   function getWalls(d) {
     const s = _segmentAt(d);
-    const width = _widthAt(d);
+    let width = _widthAt(d);
     const W = CONFIG.CANVAS_W;
     const full = C.WIDE_WIDTH;
-    const margin = (W - full) / 2;   // поля при широком проходе
+    const margin = (W - full) / 2;
+
+    // Компенсация наростов
+    let growL = 0, growR = 0;
+    if (typeof Growth !== 'undefined') {
+      growL = Growth.reachAt(d, s.phase, 'left', s.side);
+      growR = Growth.reachAt(d, s.phase, 'right', s.side);
+      const eaten = growL + growR;
+      if (eaten > 0) {
+        // минимум, который обязан остаться чистым
+        const need = CONFIG.DRONE_RADIUS * 2 + CONFIG.GROWTH.MIN_GAP;
+        width = Math.max(width, need + eaten);
+      }
+    }
 
     let left, right;
     if (s.side === SIDE.LEFT) {
-      right = W - margin;            // правая неподвижна
+      right = W - margin;
       left = right - width;
     } else if (s.side === SIDE.RIGHT) {
-      left = margin;                 // левая неподвижна
+      left = margin;
       right = left + width;
     } else {
-      const c = W / 2;               // обе сходятся к центру
+      const c = W / 2;
       left = c - width / 2;
       right = c + width / 2;
     }
@@ -119,7 +136,15 @@ const Canyon = (() => {
     left += n1;
     right += n2;
 
-    return { left, right, width: right - left, phase: s.phase, side: s.side };
+    // Наросты — это уже опасная граница, по ней и считаем столкновение
+    return {
+      left, right,
+      width: right - left,
+      hitLeft: left + growL,          // фактическая граница с наростом
+      hitRight: right - growR,
+      growL, growR,
+      phase: s.phase, side: s.side,
+    };
   }
 
   return { reset, getWalls, PHASE, SIDE };
