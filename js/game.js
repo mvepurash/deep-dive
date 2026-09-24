@@ -16,6 +16,11 @@ const Game = (() => {
   let speedMod = 0;                             // -1 тормоз, +1 ускорение
   let energy = CONFIG.ENERGY.MAX;
   let regenDelay = 0;
+  let shieldTime = 0;      // сколько ещё действует щит
+  let weaponTime = 0;      // сколько ещё стреляет оружие
+  let shotTimer = 0;
+  let shots = [];          // {x, depth}
+  let cleared = [];        // расстрелянные наросты: {depth, side}
 
   // Сколько метров укладывается в высоту экрана — задаёт масштаб обзора
   const M_PER_SCREEN = 340;
@@ -43,6 +48,8 @@ const Game = (() => {
     Pickups.reset();
     energy = CONFIG.ENERGY.MAX;
     regenDelay = 0;
+    shieldTime = 0; weaponTime = 0; shotTimer = 0;
+    shots = []; cleared = [];
     running = true;
   }
 
@@ -185,14 +192,40 @@ const Game = (() => {
     const droneDepthNow = depth + (CONFIG.DRONE_Y / PX_PER_M);
     for (const type of Pickups.collect(Drone.x, droneDepthNow, PX_PER_M)) {
       if (type === 'energy') energy = Math.min(CONFIG.ENERGY.MAX, energy + CONFIG.PICKUP.ENERGY_GAIN);
+      // Оружие и щит включаются сразу: при одном пальце кнопок активации нет
+      if (type === 'shield') shieldTime = CONFIG.PICKUP.SHIELD_TIME;
+      if (type === 'weapon') weaponTime = CONFIG.PICKUP.WEAPON_TIME;
     }
+
+    // Таймеры эффектов
+    if (shieldTime > 0) shieldTime -= dt;
+    if (weaponTime > 0) {
+      weaponTime -= dt;
+      shotTimer -= dt;
+      if (shotTimer <= 0) {
+        shotTimer = CONFIG.PICKUP.WEAPON_RATE;
+        shots.push({ x: Drone.x, depth: droneDepthNow });
+      }
+    }
+
+    // Снаряды летят вниз, расчищают наросты на своём пути
+    const shotStep = CONFIG.PICKUP.SHOT_SPEED / PX_PER_M * dt;
+    for (const sh of shots) {
+      sh.depth += shotStep;
+      const w = Canyon.getWalls(sh.depth);
+      if (sh.x <= w.hitLeft)  { cleared.push({ depth: sh.depth, side: 'left'  }); sh.dead = true; }
+      if (sh.x >= w.hitRight) { cleared.push({ depth: sh.depth, side: 'right' }); sh.dead = true; }
+    }
+    shots = shots.filter(sh => !sh.dead && sh.depth < depth + CONFIG.CANVAS_H / PX_PER_M + 50);
+    // Расчищенные участки живут недолго — только пока видны
+    cleared = cleared.filter(c => c.depth > depth - 50);
 
     // Столкновение со стенами на глубине дрона
     const droneDepth = depth + (CONFIG.DRONE_Y / PX_PER_M);
     const w = Canyon.getWalls(droneDepth);
     const r = CONFIG.DRONE_RADIUS;
     if (Drone.x - r < w.hitLeft || Drone.x + r > w.hitRight) {
-      _crash();
+      if (shieldTime <= 0) _crash();
     }
   }
 
@@ -248,6 +281,13 @@ const Game = (() => {
     }
     ctx.stroke();
 
+    // Снаряды
+    ctx.fillStyle = '#ff8a6e';
+    for (const sh of shots) {
+      const py = CONFIG.DRONE_Y + (sh.depth - depth - CONFIG.DRONE_Y / PX_PER_M) * PX_PER_M;
+      ctx.beginPath(); ctx.arc(sh.x, py, CONFIG.PICKUP.SHOT_RADIUS, 0, Math.PI * 2); ctx.fill();
+    }
+
     Pickups.draw(ctx, depth, PX_PER_M, CONFIG.DRONE_Y);
 
     // Дрон — пока просто круг
@@ -255,6 +295,16 @@ const Game = (() => {
     ctx.beginPath();
     ctx.arc(Drone.x, CONFIG.DRONE_Y, CONFIG.DRONE_RADIUS, 0, Math.PI * 2);
     ctx.fill();
+    // Щит — кольцо вокруг дрона, мигает к концу действия
+    if (shieldTime > 0) {
+      const fade = shieldTime < 1.5 ? (Math.sin(shieldTime * 18) * 0.5 + 0.5) : 1;
+      ctx.strokeStyle = `rgba(127,212,255,${0.85 * fade})`;
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.arc(Drone.x, CONFIG.DRONE_Y, CONFIG.DRONE_RADIUS + 9, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+
     // Лёгкий след показывает инерцию
     ctx.strokeStyle = 'rgba(95,216,255,0.5)';
     ctx.lineWidth = 3;
@@ -349,8 +399,26 @@ const Game = (() => {
     ctx.fillText('ЭНЕРГИЯ', CONFIG.CANVAS_W / 2, y + h + 12);
   }
 
+  function _drawEffects() {
+    const items = [];
+    if (shieldTime > 0) items.push({ t: shieldTime, max: CONFIG.PICKUP.SHIELD_TIME, c: '#7fd4ff', n: 'ЩИТ' });
+    if (weaponTime > 0) items.push({ t: weaponTime, max: CONFIG.PICKUP.WEAPON_TIME, c: '#ff8a6e', n: 'ОГОНЬ' });
+    items.forEach((it, i) => {
+      const y = 104 + i * 20;
+      ctx.fillStyle = it.c;
+      ctx.font = 'bold 11px sans-serif';
+      ctx.textAlign = 'right';
+      ctx.fillText(it.n, CONFIG.CANVAS_W / 2 - 42, y + 8);
+      ctx.fillStyle = 'rgba(10,30,44,0.8)';
+      ctx.fillRect(CONFIG.CANVAS_W / 2 - 36, y, 80, 7);
+      ctx.fillStyle = it.c;
+      ctx.fillRect(CONFIG.CANVAS_W / 2 - 36, y, 80 * (it.t / it.max), 7);
+    });
+  }
+
   function _drawHud() {
     _drawEnergyBar();
+    _drawEffects();
     ctx.fillStyle = '#9fe8ff';
     ctx.font = 'bold 26px sans-serif';
     ctx.textAlign = 'center';
@@ -389,6 +457,14 @@ const Game = (() => {
 
   window.addEventListener('load', init);
 
-  return { start };
+  // Проверка, расчищен ли участок стены выстрелом
+  function isCleared(d, side) {
+    for (const c of cleared) {
+      if (c.side === side && Math.abs(c.depth - d) < 22) return true;
+    }
+    return false;
+  }
+
+  return { start, isCleared };
 
 })();

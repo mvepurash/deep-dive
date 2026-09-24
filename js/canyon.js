@@ -109,6 +109,11 @@ const Canyon = (() => {
     if (typeof Growth !== 'undefined') {
       growL = Growth.reachAt(d, s.phase, 'left', s.side);
       growR = Growth.reachAt(d, s.phase, 'right', s.side);
+      // Расстрелянные участки — наростов там больше нет
+      if (typeof Game !== 'undefined' && Game.isCleared) {
+        if (Game.isCleared(d, 'left'))  growL = 0;
+        if (Game.isCleared(d, 'right')) growR = 0;
+      }
       const eaten = growL + growR;
       if (eaten > 0) {
         // минимум, который обязан остаться чистым

@@ -16,9 +16,17 @@ const Pickups = (() => {
 
   const TYPES = {
     energy: { color: '#ffd36e', glow: 'rgba(255,211,110,0.9)', label: 'E' },
-    // shield: { ... }   — следующим шагом
-    // weapon: { ... }
+    shield: { color: '#7fd4ff', glow: 'rgba(127,212,255,0.9)', label: 'S' },
+    weapon: { color: '#ff8a6e', glow: 'rgba(255,138,110,0.9)', label: 'W' },
   };
+
+  // Случайный тип по весам
+  function _rollType() {
+    const w = CONFIG.PICKUP.WEIGHTS;
+    let r = Math.random(), acc = 0;
+    for (const [k, v] of Object.entries(w)) { acc += v; if (r < acc) return k; }
+    return 'energy';
+  }
 
   let items = [];
   let nextSpawnDepth = 0;
@@ -43,7 +51,7 @@ const Pickups = (() => {
           items.push({
             depth: d,
             x: lo + Math.random() * (hi - lo),
-            type: 'energy',
+            type: _rollType(),
             taken: false,
           });
         }
