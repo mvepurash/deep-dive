@@ -39,57 +39,78 @@ const Game = (() => {
     running = true;
   }
 
+  // Геометрия полосы управления
+  function _stripRect() {
+    const S = CONFIG.STRIP;
+    return {
+      x: S.MARGIN_X,
+      y: CONFIG.CANVAS_H - S.BOTTOM - S.HEIGHT,
+      w: CONFIG.CANVAS_W - S.MARGIN_X * 2,
+      h: S.HEIGHT,
+    };
+  }
+
   function _bindInput() {
-    const toCanvasX = (clientX) => {
+    const toCanvas = (clientX, clientY) => {
       const r = canvas.getBoundingClientRect();
-      return (clientX - r.left) * (CONFIG.CANVAS_W / r.width);
+      return {
+        x: (clientX - r.left) * (CONFIG.CANVAS_W / r.width),
+        y: (clientY - r.top)  * (CONFIG.CANVAS_H / r.height),
+      };
     };
 
-    // Абсолютное: дрон встаёт туда, где палец
-    const moveAbsolute = (clientX) => Drone.setTarget(toCanvasX(clientX));
-
-    // Относительное: палец кладётся где удобно и сдвигается; дрон смещается
-    // на величину сдвига. Палец остаётся в нижнем углу, не закрывает обзор
-    // и не тянется через весь экран.
-    let anchorX = null;        // где палец коснулся
-    let anchorTarget = 0;      // где была цель дрона в этот момент
-
-    const grab = (clientX) => {
-      anchorX = toCanvasX(clientX);
-      anchorTarget = Drone.target;
+    // Полоса: положение пальца на полосе линейно отображается на всю ширину
+    // прохода. Полоса уже экрана, поэтому ход пальца меньше хода дрона.
+    const stripTarget = (cx) => {
+      const s = _stripRect();
+      const t = Math.max(0, Math.min(1, (cx - s.x) / s.w));
+      const r = CONFIG.DRONE_RADIUS;
+      Drone.setTarget(r + t * (CONFIG.CANVAS_W - r * 2));
     };
-    const drag = (clientX) => {
-      if (anchorX === null) { grab(clientX); return; }
-      const delta = (toCanvasX(clientX) - anchorX) * CONFIG.CONTROL_SENSITIVITY;
-      Drone.setTarget(anchorTarget + delta);
+
+    // Относительное
+    let anchorX = null, anchorTarget = 0;
+    const grab = (cx) => { anchorX = cx; anchorTarget = Drone.target; };
+    const drag = (cx) => {
+      if (anchorX === null) { grab(cx); return; }
+      Drone.setTarget(anchorTarget + (cx - anchorX) * CONFIG.CONTROL_SENSITIVITY);
+    };
+
+    const onStart = (cx, cy) => {
+      const m = CONFIG.CONTROL_MODE;
+      if (m === 'strip')        stripTarget(cx);
+      else if (m === 'relative') grab(cx);
+      else                       Drone.setTarget(cx);
+    };
+    const onMove = (cx, cy) => {
+      const m = CONFIG.CONTROL_MODE;
+      if (m === 'strip')        stripTarget(cx);
+      else if (m === 'relative') drag(cx);
+      else                       Drone.setTarget(cx);
     };
     const release = () => { anchorX = null; };
 
-    const onStart = (clientX) => CONFIG.CONTROL_RELATIVE ? grab(clientX) : moveAbsolute(clientX);
-    const onMove  = (clientX) => CONFIG.CONTROL_RELATIVE ? drag(clientX)  : moveAbsolute(clientX);
-
-    canvas.addEventListener('touchstart', e => { e.preventDefault(); onStart(e.touches[0].clientX); }, { passive: false });
-    canvas.addEventListener('touchmove',  e => { e.preventDefault(); onMove(e.touches[0].clientX); }, { passive: false });
+    canvas.addEventListener('touchstart', e => { e.preventDefault(); const p = toCanvas(e.touches[0].clientX, e.touches[0].clientY); onStart(p.x, p.y); }, { passive: false });
+    canvas.addEventListener('touchmove',  e => { e.preventDefault(); const p = toCanvas(e.touches[0].clientX, e.touches[0].clientY); onMove(p.x, p.y); }, { passive: false });
     canvas.addEventListener('touchend',   e => { e.preventDefault(); release(); }, { passive: false });
 
-    // Мышь: в относительном режиме управляем только при зажатой кнопке,
-    // иначе курсор «таскал» бы дрон даже при случайном движении
     let mouseDown = false;
-    window.addEventListener('mousedown', e => { mouseDown = true; onStart(e.clientX); });
+    window.addEventListener('mousedown', e => { mouseDown = true; const p = toCanvas(e.clientX, e.clientY); onStart(p.x, p.y); });
     window.addEventListener('mouseup',   () => { mouseDown = false; release(); });
     window.addEventListener('mousemove', e => {
-      if (CONFIG.CONTROL_RELATIVE) { if (mouseDown) onMove(e.clientX); }
-      else onMove(e.clientX);
+      const p = toCanvas(e.clientX, e.clientY);
+      if (CONFIG.CONTROL_MODE === 'absolute') onMove(p.x, p.y);
+      else if (mouseDown) onMove(p.x, p.y);
     });
 
-    // Клавиатура — для удобства отладки на компьютере
     document.addEventListener('keydown', e => {
       if (e.key === 'ArrowLeft')  Drone.setTarget(Drone.target - 60);
       if (e.key === 'ArrowRight') Drone.setTarget(Drone.target + 60);
       if (e.key === 'r' || e.key === 'R') start();
-      // C — на лету переключить схему управления для сравнения
+      // C — циклом переключить схему управления для сравнения
       if (e.key === 'c' || e.key === 'C') {
-        CONFIG.CONTROL_RELATIVE = !CONFIG.CONTROL_RELATIVE;
+        const order = ['strip', 'relative', 'absolute'];
+        CONFIG.CONTROL_MODE = order[(order.indexOf(CONFIG.CONTROL_MODE) + 1) % order.length];
         release();
       }
     });
@@ -179,7 +200,44 @@ const Game = (() => {
     ctx.lineTo(Drone.x - Drone.vx * 0.06, CONFIG.DRONE_Y + 14);
     ctx.stroke();
 
+    _drawStrip();
     _drawHud();
+  }
+
+  // Отладочные строки ставим НАД полосой управления, иначе она их накрывает
+  function _dbgY(i) {
+    const stripTop = CONFIG.CANVAS_H - CONFIG.STRIP.BOTTOM - CONFIG.STRIP.HEIGHT;
+    const base = (CONFIG.CONTROL_MODE === 'strip' ? stripTop : CONFIG.CANVAS_H) - 12;
+    return base - (3 - i) * 16;
+  }
+
+  function _drawStrip() {
+    if (CONFIG.CONTROL_MODE !== 'strip') return;
+    const s = _stripRect();
+
+    ctx.fillStyle = 'rgba(8,26,38,0.82)';
+    ctx.beginPath(); ctx.roundRect(s.x, s.y, s.w, s.h, 12); ctx.fill();
+    ctx.strokeStyle = 'rgba(95,216,255,0.45)';
+    ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.roundRect(s.x, s.y, s.w, s.h, 12); ctx.stroke();
+
+    // Насечки — показывают, что полосу можно возить пальцем
+    ctx.strokeStyle = 'rgba(95,216,255,0.22)';
+    ctx.lineWidth = 1;
+    for (let i = 1; i < 8; i++) {
+      const x = s.x + s.w * i / 8;
+      ctx.beginPath(); ctx.moveTo(x, s.y + 10); ctx.lineTo(x, s.y + s.h - 10); ctx.stroke();
+    }
+
+    // Ползунок стоит там, где дрон
+    const r = CONFIG.DRONE_RADIUS;
+    const t = (Drone.x - r) / (CONFIG.CANVAS_W - r * 2);
+    const hx = s.x + t * s.w;
+    ctx.fillStyle = '#5fd8ff';
+    ctx.shadowColor = 'rgba(95,216,255,0.9)';
+    ctx.shadowBlur = 14;
+    ctx.beginPath(); ctx.roundRect(hx - 22, s.y + 8, 44, s.h - 16, 9); ctx.fill();
+    ctx.shadowBlur = 0;
   }
 
   function _drawHud() {
@@ -202,12 +260,12 @@ const Game = (() => {
     ctx.textAlign = 'left';
     ctx.font = '12px monospace';
     ctx.fillStyle = w.phase === 'throat' ? '#ff9a6e' : '#7fd4a8';
-    ctx.fillText(names[w.phase], 10, CONFIG.CANVAS_H - 58);
+    ctx.fillText(names[w.phase], 10, _dbgY(0));
     ctx.fillStyle = '#7fb0d4';
-    ctx.fillText(sides[w.side], 10, CONFIG.CANVAS_H - 42);
+    ctx.fillText(sides[w.side], 10, _dbgY(1));
     const eff = Math.round(w.hitRight - w.hitLeft);
-    ctx.fillText('проход ' + Math.round(w.width) + 'px  чистый ' + eff + 'px', 10, CONFIG.CANVAS_H - 26);
-    ctx.fillText('падение ' + Math.round(fallSpeed) + ' м/с', 10, CONFIG.CANVAS_H - 10);
+    ctx.fillText('проход ' + Math.round(w.width) + 'px  чистый ' + eff + 'px', 10, _dbgY(2));
+    ctx.fillText('падение ' + Math.round(fallSpeed) + ' м/с   [C] режим: ' + CONFIG.CONTROL_MODE, 10, _dbgY(3));
   }
 
   function loop(now) {
