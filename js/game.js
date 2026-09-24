@@ -101,10 +101,18 @@ const Game = (() => {
       let dx = (cx - c.x) / R, dy = (cy - c.y) / R;
       const len = Math.hypot(dx, dy);
       if (len > 1) { dx /= len; dy /= len; }          // не выходим за круг
-      const dz = CONFIG.JOY.DEADZONE;
+      const dz = CONFIG.JOY.DEADZONE, g = CONFIG.JOY.GAIN;
+      // За мёртвой зоной шкалу растягиваем, чтобы не было скачка на выходе
+      // из неё, и усиливаем: полный ход не требует упираться в край
+      const shape = (v) => {
+        const a = Math.abs(v);
+        if (a < dz) return 0;
+        const norm = (a - dz) / (1 - dz);
+        return Math.sign(v) * Math.min(1, norm * g);
+      };
       joy.active = true;
-      joy.dx = Math.abs(dx) < dz ? 0 : dx;
-      joy.dy = Math.abs(dy) < dz ? 0 : dy;
+      joy.dx = shape(dx);
+      joy.dy = shape(dy);
     };
     const joyRelease = () => { joy.active = false; joy.dx = 0; joy.dy = 0; };
 
