@@ -44,20 +44,54 @@ const Game = (() => {
       const r = canvas.getBoundingClientRect();
       return (clientX - r.left) * (CONFIG.CANVAS_W / r.width);
     };
-    const move = (clientX) => Drone.setTarget(toCanvasX(clientX));
 
-    canvas.addEventListener('touchstart', e => { e.preventDefault(); move(e.touches[0].clientX); }, { passive: false });
-    canvas.addEventListener('touchmove',  e => { e.preventDefault(); move(e.touches[0].clientX); }, { passive: false });
+    // Абсолютное: дрон встаёт туда, где палец
+    const moveAbsolute = (clientX) => Drone.setTarget(toCanvasX(clientX));
 
-    // Мышь слушаем на ВСЁМ окне, а не только над холстом: иначе управление
-    // пропадает, стоит курсору выйти за край, и это читается как «не реагирует»
-    window.addEventListener('mousemove', e => move(e.clientX));
+    // Относительное: палец кладётся где удобно и сдвигается; дрон смещается
+    // на величину сдвига. Палец остаётся в нижнем углу, не закрывает обзор
+    // и не тянется через весь экран.
+    let anchorX = null;        // где палец коснулся
+    let anchorTarget = 0;      // где была цель дрона в этот момент
+
+    const grab = (clientX) => {
+      anchorX = toCanvasX(clientX);
+      anchorTarget = Drone.target;
+    };
+    const drag = (clientX) => {
+      if (anchorX === null) { grab(clientX); return; }
+      const delta = (toCanvasX(clientX) - anchorX) * CONFIG.CONTROL_SENSITIVITY;
+      Drone.setTarget(anchorTarget + delta);
+    };
+    const release = () => { anchorX = null; };
+
+    const onStart = (clientX) => CONFIG.CONTROL_RELATIVE ? grab(clientX) : moveAbsolute(clientX);
+    const onMove  = (clientX) => CONFIG.CONTROL_RELATIVE ? drag(clientX)  : moveAbsolute(clientX);
+
+    canvas.addEventListener('touchstart', e => { e.preventDefault(); onStart(e.touches[0].clientX); }, { passive: false });
+    canvas.addEventListener('touchmove',  e => { e.preventDefault(); onMove(e.touches[0].clientX); }, { passive: false });
+    canvas.addEventListener('touchend',   e => { e.preventDefault(); release(); }, { passive: false });
+
+    // Мышь: в относительном режиме управляем только при зажатой кнопке,
+    // иначе курсор «таскал» бы дрон даже при случайном движении
+    let mouseDown = false;
+    window.addEventListener('mousedown', e => { mouseDown = true; onStart(e.clientX); });
+    window.addEventListener('mouseup',   () => { mouseDown = false; release(); });
+    window.addEventListener('mousemove', e => {
+      if (CONFIG.CONTROL_RELATIVE) { if (mouseDown) onMove(e.clientX); }
+      else onMove(e.clientX);
+    });
 
     // Клавиатура — для удобства отладки на компьютере
     document.addEventListener('keydown', e => {
-      if (e.key === 'ArrowLeft')  Drone.setTarget(Drone.x - 60);
-      if (e.key === 'ArrowRight') Drone.setTarget(Drone.x + 60);
+      if (e.key === 'ArrowLeft')  Drone.setTarget(Drone.target - 60);
+      if (e.key === 'ArrowRight') Drone.setTarget(Drone.target + 60);
       if (e.key === 'r' || e.key === 'R') start();
+      // C — на лету переключить схему управления для сравнения
+      if (e.key === 'c' || e.key === 'C') {
+        CONFIG.CONTROL_RELATIVE = !CONFIG.CONTROL_RELATIVE;
+        release();
+      }
     });
   }
 

@@ -19,7 +19,13 @@ const Drone = (() => {
     alive = true;
   }
 
-  function setTarget(tx) { targetX = tx; }
+  // Цель ограничиваем краями: при относительном управлении палец можно
+  // увести далеко, и без ограничения цель «улетала» бы за экран, после чего
+  // дрон переставал отзываться на обратное движение
+  function setTarget(tx) {
+    const r = CONFIG.DRONE_RADIUS;
+    targetX = Math.max(r, Math.min(CONFIG.CANVAS_W - r, tx));
+  }
 
   function update(dt) {
     if (!alive) return;
@@ -48,6 +54,7 @@ const Drone = (() => {
     reset, update, setTarget, kill,
     get x() { return x; },
     get vx() { return vx; },
+    get target() { return targetX; },
     get alive() { return alive; },
   };
 
