@@ -14,6 +14,8 @@ const Game = (() => {
   let bestDepth = 0;
   let joy = { active: false, dx: 0, dy: 0 };   // отклонение стика, -1..1
   let speedMod = 0;                             // -1 тормоз, +1 ускорение
+  let energy = CONFIG.ENERGY.MAX;
+  let regenDelay = 0;
 
   // Сколько метров укладывается в высоту экрана — задаёт масштаб обзора
   const M_PER_SCREEN = 340;
@@ -38,6 +40,9 @@ const Game = (() => {
     fallSpeed = CONFIG.FALL_SPEED_START;
     Canyon.reset();
     Drone.reset();
+    Pickups.reset();
+    energy = CONFIG.ENERGY.MAX;
+    regenDelay = 0;
     running = true;
   }
 
@@ -150,6 +155,17 @@ const Game = (() => {
       speedMod = 0;
     }
 
+    // Торможение стоит энергии. Кончилась — тормозить нечем, падаешь как есть.
+    const E = CONFIG.ENERGY;
+    if (speedMod < 0) {
+      const want = -speedMod * E.BRAKE_COST * dt;
+      if (energy >= want) { energy -= want; regenDelay = E.REGEN_DELAY; }
+      else { energy = 0; speedMod = 0; }     // запас исчерпан — тормоз отключается
+    } else {
+      if (regenDelay > 0) regenDelay -= dt;
+      else energy = Math.min(E.MAX, energy + E.REGEN * dt);
+    }
+
     // Падение: скорость растёт с глубиной, но медленно
     const base = Math.min(CONFIG.FALL_SPEED_MAX,
                           CONFIG.FALL_SPEED_START + depth * CONFIG.FALL_ACCEL_PER_M);
@@ -162,6 +178,14 @@ const Game = (() => {
     depth += fallSpeed * dt;
 
     Drone.update(dt);
+
+    // Предметы всплывают навстречу
+    const aheadDepth = depth + CONFIG.CANVAS_H / PX_PER_M;
+    Pickups.update(depth, aheadDepth, dt);
+    const droneDepthNow = depth + (CONFIG.DRONE_Y / PX_PER_M);
+    for (const type of Pickups.collect(Drone.x, droneDepthNow, PX_PER_M)) {
+      if (type === 'energy') energy = Math.min(CONFIG.ENERGY.MAX, energy + CONFIG.PICKUP.ENERGY_GAIN);
+    }
 
     // Столкновение со стенами на глубине дрона
     const droneDepth = depth + (CONFIG.DRONE_Y / PX_PER_M);
@@ -223,6 +247,8 @@ const Game = (() => {
       if (py === 0) ctx.moveTo(w.right, py); else ctx.lineTo(w.right, py);
     }
     ctx.stroke();
+
+    Pickups.draw(ctx, depth, PX_PER_M, CONFIG.DRONE_Y);
 
     // Дрон — пока просто круг
     ctx.fillStyle = Drone.alive ? '#5fd8ff' : '#ff4444';
@@ -307,7 +333,24 @@ const Game = (() => {
     ctx.shadowBlur = 0;
   }
 
+  function _drawEnergyBar() {
+    const w = 150, h = 10, x = (CONFIG.CANVAS_W - w) / 2, y = 76;
+    const t = energy / CONFIG.ENERGY.MAX;
+    ctx.fillStyle = 'rgba(10,30,44,0.8)';
+    ctx.beginPath(); ctx.roundRect(x, y, w, h, 5); ctx.fill();
+    ctx.fillStyle = t > 0.3 ? '#ffd36e' : '#ff6e6e';
+    ctx.beginPath(); ctx.roundRect(x, y, w * t, h, 5); ctx.fill();
+    ctx.strokeStyle = 'rgba(95,216,255,0.35)';
+    ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.roundRect(x, y, w, h, 5); ctx.stroke();
+    ctx.fillStyle = '#6fa8bd';
+    ctx.font = '10px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('ЭНЕРГИЯ', CONFIG.CANVAS_W / 2, y + h + 12);
+  }
+
   function _drawHud() {
+    _drawEnergyBar();
     ctx.fillStyle = '#9fe8ff';
     ctx.font = 'bold 26px sans-serif';
     ctx.textAlign = 'center';
