@@ -12,6 +12,8 @@ const Game = (() => {
   let running = false;
   let lastTime = 0;
   let bestDepth = 0;
+  let joy = { active: false, dx: 0, dy: 0 };   // отклонение стика, -1..1
+  let speedMod = 0;                             // -1 тормоз, +1 ускорение
 
   // Сколько метров укладывается в высоту экрана — задаёт масштаб обзора
   const M_PER_SCREEN = 340;
@@ -37,6 +39,10 @@ const Game = (() => {
     Canyon.reset();
     Drone.reset();
     running = true;
+  }
+
+  function _joyCenter() {
+    return { x: CONFIG.CANVAS_W / 2, y: CONFIG.CANVAS_H - CONFIG.JOY.BOTTOM };
   }
 
   // Геометрия полосы управления
@@ -76,19 +82,35 @@ const Game = (() => {
       Drone.setTarget(anchorTarget + (cx - anchorX) * CONFIG.CONTROL_SENSITIVITY);
     };
 
+    // Джойстик: считаем отклонение от центра площадки
+    const joyMove = (cx, cy) => {
+      const c = _joyCenter();
+      const R = CONFIG.JOY.RADIUS;
+      let dx = (cx - c.x) / R, dy = (cy - c.y) / R;
+      const len = Math.hypot(dx, dy);
+      if (len > 1) { dx /= len; dy /= len; }          // не выходим за круг
+      const dz = CONFIG.JOY.DEADZONE;
+      joy.active = true;
+      joy.dx = Math.abs(dx) < dz ? 0 : dx;
+      joy.dy = Math.abs(dy) < dz ? 0 : dy;
+    };
+    const joyRelease = () => { joy.active = false; joy.dx = 0; joy.dy = 0; };
+
     const onStart = (cx, cy) => {
       const m = CONFIG.CONTROL_MODE;
-      if (m === 'strip')        stripTarget(cx);
+      if (m === 'joystick')      joyMove(cx, cy);
+      else if (m === 'strip')    stripTarget(cx);
       else if (m === 'relative') grab(cx);
       else                       Drone.setTarget(cx);
     };
     const onMove = (cx, cy) => {
       const m = CONFIG.CONTROL_MODE;
-      if (m === 'strip')        stripTarget(cx);
+      if (m === 'joystick')      joyMove(cx, cy);
+      else if (m === 'strip')    stripTarget(cx);
       else if (m === 'relative') drag(cx);
       else                       Drone.setTarget(cx);
     };
-    const release = () => { anchorX = null; };
+    const release = () => { anchorX = null; joyRelease(); };
 
     canvas.addEventListener('touchstart', e => { e.preventDefault(); const p = toCanvas(e.touches[0].clientX, e.touches[0].clientY); onStart(p.x, p.y); }, { passive: false });
     canvas.addEventListener('touchmove',  e => { e.preventDefault(); const p = toCanvas(e.touches[0].clientX, e.touches[0].clientY); onMove(p.x, p.y); }, { passive: false });
@@ -109,7 +131,7 @@ const Game = (() => {
       if (e.key === 'r' || e.key === 'R') start();
       // C — циклом переключить схему управления для сравнения
       if (e.key === 'c' || e.key === 'C') {
-        const order = ['strip', 'relative', 'absolute'];
+        const order = ['joystick', 'strip', 'relative', 'absolute'];
         CONFIG.CONTROL_MODE = order[(order.indexOf(CONFIG.CONTROL_MODE) + 1) % order.length];
         release();
       }
@@ -119,9 +141,24 @@ const Game = (() => {
   function update(dt) {
     if (!running) return;
 
+    // Джойстик: горизонталь задаёт скорость дрона, вертикаль — темп погружения
+    if (CONFIG.CONTROL_MODE === 'joystick') {
+      Drone.setVelocity(joy.dx * CONFIG.DRONE_MAX_SPEED);
+      speedMod = -joy.dy;                 // палец вверх по стику = ускорение
+    } else {
+      Drone.setPositionMode();
+      speedMod = 0;
+    }
+
     // Падение: скорость растёт с глубиной, но медленно
-    fallSpeed = Math.min(CONFIG.FALL_SPEED_MAX,
-                         CONFIG.FALL_SPEED_START + depth * CONFIG.FALL_ACCEL_PER_M);
+    const base = Math.min(CONFIG.FALL_SPEED_MAX,
+                          CONFIG.FALL_SPEED_START + depth * CONFIG.FALL_ACCEL_PER_M);
+    // Торможение и ускорение. Цена торможения встроена: глубина — это счёт,
+    // значит медленное погружение само себя наказывает, выдумывать штраф не нужно.
+    const mod = speedMod >= 0
+      ? 1 + speedMod * CONFIG.JOY.BOOST_FACTOR
+      : 1 + speedMod * CONFIG.JOY.BRAKE_FACTOR;
+    fallSpeed = base * mod;
     depth += fallSpeed * dt;
 
     Drone.update(dt);
@@ -201,13 +238,16 @@ const Game = (() => {
     ctx.stroke();
 
     _drawStrip();
+    _drawJoy();
     _drawHud();
   }
 
   // Отладочные строки ставим НАД полосой управления, иначе она их накрывает
   function _dbgY(i) {
     const stripTop = CONFIG.CANVAS_H - CONFIG.STRIP.BOTTOM - CONFIG.STRIP.HEIGHT;
-    const base = (CONFIG.CONTROL_MODE === 'strip' ? stripTop : CONFIG.CANVAS_H) - 12;
+    const joyTop = CONFIG.CANVAS_H - CONFIG.JOY.BOTTOM - CONFIG.JOY.RADIUS;
+    const m = CONFIG.CONTROL_MODE;
+    const base = (m === 'strip' ? stripTop : m === 'joystick' ? joyTop : CONFIG.CANVAS_H) - 12;
     return base - (3 - i) * 16;
   }
 
@@ -240,6 +280,33 @@ const Game = (() => {
     ctx.shadowBlur = 0;
   }
 
+  function _drawJoy() {
+    if (CONFIG.CONTROL_MODE !== 'joystick') return;
+    const c = _joyCenter(), R = CONFIG.JOY.RADIUS;
+
+    ctx.fillStyle = 'rgba(8,26,38,0.55)';
+    ctx.beginPath(); ctx.arc(c.x, c.y, R, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = 'rgba(95,216,255,0.35)';
+    ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(c.x, c.y, R, 0, Math.PI * 2); ctx.stroke();
+
+    // Подсказки осей: вверх — быстрее, вниз — медленнее
+    ctx.fillStyle = 'rgba(95,216,255,0.4)';
+    ctx.font = '10px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('БЫСТРЕЕ', c.x, c.y - R + 16);
+    ctx.fillText('ТОРМОЗ',  c.x, c.y + R - 8);
+
+    // Ручка
+    const hx = c.x + joy.dx * R * 0.72;
+    const hy = c.y + joy.dy * R * 0.72;
+    ctx.fillStyle = joy.active ? '#5fd8ff' : 'rgba(95,216,255,0.5)';
+    ctx.shadowColor = 'rgba(95,216,255,0.9)';
+    ctx.shadowBlur = joy.active ? 16 : 0;
+    ctx.beginPath(); ctx.arc(hx, hy, 26, 0, Math.PI * 2); ctx.fill();
+    ctx.shadowBlur = 0;
+  }
+
   function _drawHud() {
     ctx.fillStyle = '#9fe8ff';
     ctx.font = 'bold 26px sans-serif';
@@ -265,7 +332,8 @@ const Game = (() => {
     ctx.fillText(sides[w.side], 10, _dbgY(1));
     const eff = Math.round(w.hitRight - w.hitLeft);
     ctx.fillText('проход ' + Math.round(w.width) + 'px  чистый ' + eff + 'px', 10, _dbgY(2));
-    ctx.fillText('падение ' + Math.round(fallSpeed) + ' м/с   [C] режим: ' + CONFIG.CONTROL_MODE, 10, _dbgY(3));
+    const modTxt = speedMod > 0.05 ? ' (ускорение)' : (speedMod < -0.05 ? ' (тормоз)' : '');
+    ctx.fillText('падение ' + Math.round(fallSpeed) + ' м/с' + modTxt + '   [C] ' + CONFIG.CONTROL_MODE, 10, _dbgY(3));
   }
 
   function loop(now) {

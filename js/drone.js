@@ -17,6 +17,7 @@ const Drone = (() => {
     vx = 0;
     targetX = x;
     alive = true;
+    desiredV = 0;
   }
 
   // Цель ограничиваем краями: при относительном управлении палец можно
@@ -27,8 +28,25 @@ const Drone = (() => {
     targetX = Math.max(r, Math.min(CONFIG.CANVAS_W - r, tx));
   }
 
+  // Скоростной режим (джойстик): отклонение стика напрямую задаёт желаемую
+  // скорость. Позиционная цель при этом не используется.
+  let velocityMode = false;
+  let desiredV = 0;
+  function setVelocity(v) { velocityMode = true; desiredV = v; }
+  function setPositionMode() { velocityMode = false; }
+
   function update(dt) {
     if (!alive) return;
+
+    if (velocityMode) {
+      vx += (desiredV - vx) * Math.min(1, CONFIG.DRONE_ACCEL_RATE * dt);
+      x += vx * dt;
+      const rr = CONFIG.DRONE_RADIUS;
+      if (x < rr) { x = rr; vx = 0; }
+      if (x > CONFIG.CANVAS_W - rr) { x = CONFIG.CANVAS_W - rr; vx = 0; }
+      targetX = x;   // держим цель при дроне, чтобы переключение режимов не дёргало
+      return;
+    }
 
     // Желаемая скорость: пропорциональна расстоянию до цели, но с потолком.
     // Раньше от расстояния зависело УСКОРЕНИЕ — из-за этого на малых
@@ -51,7 +69,7 @@ const Drone = (() => {
   function kill() { alive = false; }
 
   return {
-    reset, update, setTarget, kill,
+    reset, update, setTarget, setVelocity, setPositionMode, kill,
     get x() { return x; },
     get vx() { return vx; },
     get target() { return targetX; },
