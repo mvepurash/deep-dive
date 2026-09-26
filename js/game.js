@@ -12,7 +12,7 @@ const Game = (() => {
   let running = false;
   let lastTime = 0;
   let bestDepth = 0;
-  let joy = { active: false, dx: 0, dy: 0 };   // отклонение стика, -1..1
+  let joy = { active: false, dx: 0, dy: 0, rawx: 0, rawy: 0 };   // отклонение стика, -1..1
   let speedMod = 0;                             // -1 тормоз, +1 ускорение
   let energy = CONFIG.ENERGY.MAX;
   let regenDelay = 0;
@@ -119,24 +119,25 @@ const Game = (() => {
       let dx = (cx - c.x) / R, dy = (cy - c.y) / R;
       const len = Math.hypot(dx, dy);
       if (len > 1) { dx /= len; dy /= len; }          // не выходим за круг
-      const dz = CONFIG.JOY.DEADZONE, g = CONFIG.JOY.GAIN;
+      const dz = CONFIG.JOY.DEADZONE, k = CONFIG.JOY.CURVE;
       // За мёртвой зоной шкалу растягиваем, чтобы не было скачка на выходе
       // из неё, и усиливаем: полный ход не требует упираться в край
       const shape = (v) => {
         const a = Math.abs(v);
         if (a < dz) return 0;
-        const norm = (a - dz) / (1 - dz);
-        return Math.sign(v) * Math.min(1, norm * g);
+        const norm = Math.min(1, (a - dz) / (1 - dz));
+        return Math.sign(v) * Math.pow(norm, k);
       };
       joy.active = true;
+      joy.rawx = dx; joy.rawy = dy;      // для отрисовки ручки
       joy.dx = shape(dx);
       joy.dy = shape(dy);
     };
-    const joyRelease = () => { joy.active = false; joy.dx = 0; joy.dy = 0; joyAnchor = null; };
+    const joyRelease = () => { joy.active = false; joy.dx = 0; joy.dy = 0; joy.rawx = 0; joy.rawy = 0; joyAnchor = null; };
 
     const onStart = (cx, cy) => {
       const m = CONFIG.CONTROL_MODE;
-      if (m === 'joystick')      { _setJoyAnchor(cx, cy); joy.active = true; joy.dx = 0; joy.dy = 0; }
+      if (m === 'joystick')      { _setJoyAnchor(cx, cy); joy.active = true; joy.dx = 0; joy.dy = 0; joy.rawx = 0; joy.rawy = 0; }
       else if (m === 'strip')    stripTarget(cx);
       else if (m === 'relative') grab(cx);
       else                       Drone.setTarget(cx);
@@ -402,8 +403,8 @@ const Game = (() => {
     // Ручка
     // Ручку рисуем по СЫРОМУ отклонению пальца, а не по усиленному:
     // иначе при GAIN>1 она упирается в край раньше, чем палец
-    const hx = c.x + Math.max(-1, Math.min(1, joy.dx / CONFIG.JOY.GAIN)) * R * 0.7;
-    const hy = c.y + Math.max(-1, Math.min(1, joy.dy / CONFIG.JOY.GAIN)) * R * 0.7;
+    const hx = c.x + (joy.rawx || 0) * R * 0.72;
+    const hy = c.y + (joy.rawy || 0) * R * 0.72;
     ctx.fillStyle = joy.active ? '#5fd8ff' : 'rgba(95,216,255,0.5)';
     ctx.shadowColor = 'rgba(95,216,255,0.9)';
     ctx.shadowBlur = joy.active ? 16 : 0;
