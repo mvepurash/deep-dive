@@ -53,8 +53,26 @@ const Game = (() => {
     running = true;
   }
 
-  function _joyCenter() {
+  // Площадка «плавающая»: центр встаёт туда, куда лёг палец. Иначе всё
+  // отклонение считалось от жёсткой точки по центру экрана — палец почти
+  // всегда ложился в стороне, и ход стика съедался ещё до первого движения.
+  let joyAnchor = null;
+
+  function _joyHome() {
     return { x: CONFIG.CANVAS_W / 2, y: CONFIG.CANVAS_H - CONFIG.JOY.BOTTOM };
+  }
+
+  function _joyCenter() {
+    return joyAnchor || _joyHome();
+  }
+
+  // Центр держим так, чтобы круг целиком оставался на экране
+  function _setJoyAnchor(cx, cy) {
+    const R = CONFIG.JOY.RADIUS, m = 6;
+    joyAnchor = {
+      x: Math.max(R + m, Math.min(CONFIG.CANVAS_W - R - m, cx)),
+      y: Math.max(CONFIG.CANVAS_H * 0.45, Math.min(CONFIG.CANVAS_H - R - m, cy)),
+    };
   }
 
   // Геометрия полосы управления
@@ -114,11 +132,11 @@ const Game = (() => {
       joy.dx = shape(dx);
       joy.dy = shape(dy);
     };
-    const joyRelease = () => { joy.active = false; joy.dx = 0; joy.dy = 0; };
+    const joyRelease = () => { joy.active = false; joy.dx = 0; joy.dy = 0; joyAnchor = null; };
 
     const onStart = (cx, cy) => {
       const m = CONFIG.CONTROL_MODE;
-      if (m === 'joystick')      joyMove(cx, cy);
+      if (m === 'joystick')      { _setJoyAnchor(cx, cy); joy.active = true; joy.dx = 0; joy.dy = 0; }
       else if (m === 'strip')    stripTarget(cx);
       else if (m === 'relative') grab(cx);
       else                       Drone.setTarget(cx);
@@ -378,16 +396,18 @@ const Game = (() => {
     ctx.fillStyle = 'rgba(95,216,255,0.4)';
     ctx.font = '10px sans-serif';
     ctx.textAlign = 'center';
-    ctx.fillText('БЫСТРЕЕ', c.x, c.y - R + 16);
-    ctx.fillText('ТОРМОЗ',  c.x, c.y + R - 8);
+    ctx.fillText('БЫСТРЕЕ', c.x, c.y - R + 13);
+    ctx.fillText('ТОРМОЗ',  c.x, c.y + R - 5);
 
     // Ручка
-    const hx = c.x + joy.dx * R * 0.72;
-    const hy = c.y + joy.dy * R * 0.72;
+    // Ручку рисуем по СЫРОМУ отклонению пальца, а не по усиленному:
+    // иначе при GAIN>1 она упирается в край раньше, чем палец
+    const hx = c.x + Math.max(-1, Math.min(1, joy.dx / CONFIG.JOY.GAIN)) * R * 0.7;
+    const hy = c.y + Math.max(-1, Math.min(1, joy.dy / CONFIG.JOY.GAIN)) * R * 0.7;
     ctx.fillStyle = joy.active ? '#5fd8ff' : 'rgba(95,216,255,0.5)';
     ctx.shadowColor = 'rgba(95,216,255,0.9)';
     ctx.shadowBlur = joy.active ? 16 : 0;
-    ctx.beginPath(); ctx.arc(hx, hy, 26, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(hx, hy, 19, 0, Math.PI * 2); ctx.fill();
     ctx.shadowBlur = 0;
   }
 
