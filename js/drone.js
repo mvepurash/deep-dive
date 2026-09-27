@@ -39,11 +39,16 @@ const Drone = (() => {
     if (!alive) return;
 
     if (velocityMode) {
-      // Разгоняемся мягко, тормозим и разворачиваемся резко
-      const speedingUp = desiredV !== 0 && Math.sign(desiredV) === Math.sign(vx)
-                       && Math.abs(desiredV) > Math.abs(vx);
-      const rate = speedingUp ? CONFIG.DRONE_ACCEL_RATE : CONFIG.DRONE_BRAKE_RATE;
-      vx += (desiredV - vx) * Math.min(1, rate * dt);
+      const mass = CONFIG.DRONE_MASS;
+      if (mass <= 0) {
+        vx = desiredV;                 // нулевая инерция: точное управление
+      } else {
+        // Разгоняемся мягко, тормозим и разворачиваемся резко
+        const speedingUp = desiredV !== 0 && Math.sign(desiredV) === Math.sign(vx)
+                         && Math.abs(desiredV) > Math.abs(vx);
+        const base = speedingUp ? CONFIG.DRONE_ACCEL_RATE : CONFIG.DRONE_BRAKE_RATE;
+        vx += (desiredV - vx) * Math.min(1, (base / mass) * dt);
+      }
       x += vx * dt;
       const rr = CONFIG.DRONE_RADIUS;
       if (x < rr) { x = rr; vx = 0; }
