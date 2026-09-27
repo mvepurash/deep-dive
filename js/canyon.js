@@ -79,6 +79,24 @@ const Canyon = (() => {
   // Плавное сглаживание, чтобы стены не дёргались на стыках фаз
   function _smooth(t) { return t * t * (3 - 2 * t); }
 
+  const TAU = Math.PI * 2;
+
+  // ---- Слой 1: ось русла. Живёт независимо от ширины ----
+  function axisAt(d) {
+    const A = C.AXIS;
+    return Math.sin(d * TAU / A.SLOW_PERIOD) * A.SLOW_AMP
+         + Math.sin(d * TAU / A.FAST_PERIOD + 1.7) * A.FAST_AMP;
+  }
+
+  // ---- Слой 3: фактура. Всегда >= 0, стена только отступает ----
+  function _rough(d, seed) {
+    const R = C.ROUGH;
+    const o = (p, a, ph) => (Math.sin(d * TAU / p + ph) + 1) * 0.5 * a;
+    return o(R.O1.period, R.O1.amp, seed)
+         + o(R.O2.period, R.O2.amp, seed * 2.3 + 1.1)
+         + o(R.O3.period, R.O3.amp, seed * 5.1 + 2.7);
+  }
+
   // Ширина прохода на заданной глубине
   function _widthAt(d) {
     const s = _segmentAt(d);
@@ -122,24 +140,40 @@ const Canyon = (() => {
       }
     }
 
+    // Проход строится вокруг ГУЛЯЮЩЕЙ оси, а не вокруг краёв экрана.
+    // Асимметрия сохраняется: при давлении слева неподвижна правая
+    // кромка русла, при давлении справа — левая.
+    const axis = W / 2 + axisAt(d);
     let left, right;
     if (s.side === SIDE.LEFT) {
-      right = W - margin;
+      right = axis + full / 2;
       left = right - width;
     } else if (s.side === SIDE.RIGHT) {
-      left = margin;
+      left = axis - full / 2;
       right = left + width;
     } else {
-      const c = W / 2;
-      left = c - width / 2;
-      right = c + width / 2;
+      left = axis - width / 2;
+      right = axis + width / 2;
     }
 
-    // Фактура стен — мелкая неровность, на геймплей не влияет
-    const n1 = Math.sin(d * C.NOISE_FREQ) * C.NOISE_AMP;
-    const n2 = Math.cos(d * C.NOISE_FREQ * 1.37 + 2.1) * C.NOISE_AMP;
-    left += n1;
-    right += n2;
+    // Не выпускаем проход за экран, СОХРАНЯЯ его ширину
+    const em = C.EDGE_MARGIN;
+    if (right - left > W - em * 2) {          // шире экрана — просто центруем
+      left = em; right = W - em;
+    } else {
+      if (left < em)      { right += em - left;            left = em; }
+      if (right > W - em) { left -= right - (W - em);      right = W - em; }
+    }
+
+    // Чистая ширина прохода зафиксирована ВЫШЕ этой строки. Фактура только
+    // раздвигает стены наружу, поэтому обещанный просвет не уменьшается
+    // ни на пиксель. В горловине фактуру почти гасим: там проход должен
+    // быть точным, а не рваным.
+    const span = C.WIDE_WIDTH - C.MIN_WIDTH_FLOOR;
+    const tight = span > 0 ? (width - C.MIN_WIDTH_FLOOR) / span : 1;
+    const rs = Math.max(C.ROUGH.MIN_SCALE, Math.min(1, tight));
+    left  -= _rough(d, 0.0) * rs;
+    right += _rough(d, 3.7) * rs;
 
     // Наросты — это уже опасная граница, по ней и считаем столкновение
     return {
@@ -152,6 +186,6 @@ const Canyon = (() => {
     };
   }
 
-  return { reset, getWalls, PHASE, SIDE };
+  return { reset, getWalls, axisAt, PHASE, SIDE };
 
 })();
