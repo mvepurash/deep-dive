@@ -60,11 +60,24 @@ const Pickups = (() => {
     }
   }
 
-  // depth — текущая глубина дрона, dt — шаг кадра
+  // depth — глубина верхней кромки экрана, dt — шаг кадра
   function update(depth, aheadDepth, dt) {
     _maybeSpawn(depth, aheadDepth);
-    // Предметы всплывают, то есть их глубина уменьшается
-    for (const it of items) it.depth -= P.RISE_SPEED * dt;
+    const pad = P.RADIUS + 6;
+    for (const it of items) {
+      it.prevDepth = it.depth;
+      // Предметы всплывают, то есть их глубина уменьшается
+      it.depth -= P.RISE_SPEED * dt;
+
+      // Выше по ущелью стены стоят иначе, а x у капсулы свой. Без этого
+      // она всплывала прямо сквозь породу. Поджимаем её внутрь прохода —
+      // капсулу как бы вытесняет сужающимися стенками.
+      const w = Canyon.getWalls(it.depth);
+      const lo = w.hitLeft + pad, hi = w.hitRight - pad;
+      if (hi <= lo) { it.taken = true; continue; }   // проход уже капсулы
+      if (it.x < lo) it.x = lo;
+      if (it.x > hi) it.x = hi;
+    }
     // Убираем уплывшие вверх и подобранные
     items = items.filter(it => !it.taken && it.depth > depth - 120);
   }
@@ -74,10 +87,16 @@ const Pickups = (() => {
     const got = [];
     for (const it of items) {
       if (it.taken) continue;
+      const reach = P.RADIUS + CONFIG.DRONE_RADIUS;
       const dy = (it.depth - droneDepth) * pxPerM;
-      if (Math.abs(dy) > P.RADIUS + CONFIG.DRONE_RADIUS) continue;
+      // Скорость сближения на бусте доходит до 1400 px/с: на просадке
+      // кадров капсула перескочила бы дрона за один шаг. Поэтому ловим
+      // и сам факт пересечения глубины дрона за кадр.
+      const prev = it.prevDepth === undefined ? it.depth : it.prevDepth;
+      const crossed = (prev - droneDepth) * (it.depth - droneDepth) <= 0;
+      if (!crossed && Math.abs(dy) > reach) continue;
       const dx = it.x - droneX;
-      if (Math.hypot(dx, dy) < P.RADIUS + CONFIG.DRONE_RADIUS) {
+      if (Math.abs(dx) < reach && (crossed || Math.hypot(dx, dy) < reach)) {
         it.taken = true;
         got.push(it.type);
       }
@@ -88,7 +107,10 @@ const Pickups = (() => {
   function draw(ctx, depth, pxPerM, droneY) {
     for (const it of items) {
       if (it.taken) continue;
-      const py = droneY + (it.depth - depth) * pxPerM;
+      // depth — глубина верхней кромки экрана, поэтому droneY тут лишний:
+      // с ним капсулы рисовались на 260 px ниже, чем находились, и
+      // исчезали в момент подбора, не дойдя до дрона на экране
+      const py = (it.depth - depth) * pxPerM;
       if (py < -40 || py > CONFIG.CANVAS_H + 40) continue;
       const t = TYPES[it.type];
 
