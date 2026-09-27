@@ -113,7 +113,24 @@ const Game = (() => {
     };
 
     // Джойстик: считаем отклонение от центра площадки
+    let lastFx = null, revAccum = 0;
     const joyMove = (cx, cy) => {
+      // Центр «скользящий». Если палец пошёл против текущего отклонения,
+      // подтягиваем центр к пальцу: иначе обратный ход сначала тратится
+      // на возврат к центру, и дрон продолжает идти в прежнюю сторону —
+      // это и ощущалось как резинка, хотя физика тут ни при чём.
+      if (lastFx !== null && joyAnchor) {
+        const mdx = cx - lastFx;
+        if (mdx !== 0 && joy.rawx !== 0 && Math.sign(mdx) !== Math.sign(joy.rawx)) {
+          revAccum += Math.abs(mdx);
+          if (revAccum > 3) {                       // порог против дрожи пальца
+            const R0 = CONFIG.JOY.RADIUS, m = 6;
+            joyAnchor.x = Math.max(R0 + m, Math.min(CONFIG.CANVAS_W - R0 - m, cx));
+            revAccum = 0;
+          }
+        } else revAccum = 0;
+      }
+      lastFx = cx;
       const c = _joyCenter();
       const R = CONFIG.JOY.RADIUS;
       let dx = (cx - c.x) / R, dy = (cy - c.y) / R;
@@ -133,11 +150,11 @@ const Game = (() => {
       joy.dx = shape(dx);
       joy.dy = shape(dy);
     };
-    const joyRelease = () => { joy.active = false; joy.dx = 0; joy.dy = 0; joy.rawx = 0; joy.rawy = 0; joyAnchor = null; };
+    const joyRelease = () => { joy.active = false; joy.dx = 0; joy.dy = 0; joy.rawx = 0; joy.rawy = 0; joyAnchor = null; lastFx = null; revAccum = 0; };
 
     const onStart = (cx, cy) => {
       const m = CONFIG.CONTROL_MODE;
-      if (m === 'joystick')      { _setJoyAnchor(cx, cy); joy.active = true; joy.dx = 0; joy.dy = 0; joy.rawx = 0; joy.rawy = 0; }
+      if (m === 'joystick')      { _setJoyAnchor(cx, cy); joy.active = true; joy.dx = 0; joy.dy = 0; joy.rawx = 0; joy.rawy = 0; lastFx = cx; revAccum = 0; }
       else if (m === 'strip')    stripTarget(cx);
       else if (m === 'relative') grab(cx);
       else                       Drone.setTarget(cx);

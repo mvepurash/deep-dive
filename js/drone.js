@@ -39,7 +39,11 @@ const Drone = (() => {
     if (!alive) return;
 
     if (velocityMode) {
-      vx += (desiredV - vx) * Math.min(1, CONFIG.DRONE_ACCEL_RATE * dt);
+      // Разгоняемся мягко, тормозим и разворачиваемся резко
+      const speedingUp = desiredV !== 0 && Math.sign(desiredV) === Math.sign(vx)
+                       && Math.abs(desiredV) > Math.abs(vx);
+      const rate = speedingUp ? CONFIG.DRONE_ACCEL_RATE : CONFIG.DRONE_BRAKE_RATE;
+      vx += (desiredV - vx) * Math.min(1, rate * dt);
       x += vx * dt;
       const rr = CONFIG.DRONE_RADIUS;
       if (x < rr) { x = rr; vx = 0; }
