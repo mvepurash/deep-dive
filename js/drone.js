@@ -75,10 +75,18 @@ const Drone = (() => {
     if (x > CONFIG.CANVAS_W - r) { x = CONFIG.CANVAS_W - r; vx = 0; }
   }
 
+  // Упереть дрон в границы коридора, погасив скорость в стену
+  function clampInside(minX, maxX) {
+    if (minX > maxX) { x = (minX + maxX) / 2; vx = 0; return; }
+    if (x < minX) { x = minX; if (vx < 0) vx = 0; }
+    if (x > maxX) { x = maxX; if (vx > 0) vx = 0; }
+    targetX = x;
+  }
+
   function kill() { alive = false; }
 
   return {
-    reset, update, setTarget, setVelocity, setPositionMode, kill,
+    reset, update, setTarget, setVelocity, setPositionMode, clampInside, kill,
     get x() { return x; },
     get vx() { return vx; },
     get target() { return targetX; },

@@ -53,26 +53,11 @@ const Game = (() => {
     running = true;
   }
 
-  // Площадка «плавающая»: центр встаёт туда, куда лёг палец. Иначе всё
-  // отклонение считалось от жёсткой точки по центру экрана — палец почти
-  // всегда ложился в стороне, и ход стика съедался ещё до первого движения.
-  let joyAnchor = null;
-
-  function _joyHome() {
-    return { x: CONFIG.CANVAS_W / 2, y: CONFIG.CANVAS_H - CONFIG.JOY.BOTTOM };
-  }
-
+  // Площадка неподвижна: центр всегда в одной точке внизу экрана.
+  // Плавающий и «скользящий» центр пробовались раньше — палец их не
+  // видит, и площадка выглядела уезжающей сама по себе.
   function _joyCenter() {
-    return joyAnchor || _joyHome();
-  }
-
-  // Центр держим так, чтобы круг целиком оставался на экране
-  function _setJoyAnchor(cx, cy) {
-    const R = CONFIG.JOY.RADIUS, m = 6;
-    joyAnchor = {
-      x: Math.max(R + m, Math.min(CONFIG.CANVAS_W - R - m, cx)),
-      y: Math.max(CONFIG.CANVAS_H * 0.45, Math.min(CONFIG.CANVAS_H - R - m, cy)),
-    };
+    return { x: CONFIG.CANVAS_W / 2, y: CONFIG.CANVAS_H - CONFIG.JOY.BOTTOM };
   }
 
   // Геометрия полосы управления
@@ -112,25 +97,8 @@ const Game = (() => {
       Drone.setTarget(anchorTarget + (cx - anchorX) * CONFIG.CONTROL_SENSITIVITY);
     };
 
-    // Джойстик: считаем отклонение от центра площадки
-    let lastFx = null, revAccum = 0;
+    // Джойстик: отклонение считаем от неподвижного центра площадки
     const joyMove = (cx, cy) => {
-      // Центр «скользящий». Если палец пошёл против текущего отклонения,
-      // подтягиваем центр к пальцу: иначе обратный ход сначала тратится
-      // на возврат к центру, и дрон продолжает идти в прежнюю сторону —
-      // это и ощущалось как резинка, хотя физика тут ни при чём.
-      if (lastFx !== null && joyAnchor) {
-        const mdx = cx - lastFx;
-        if (mdx !== 0 && joy.rawx !== 0 && Math.sign(mdx) !== Math.sign(joy.rawx)) {
-          revAccum += Math.abs(mdx);
-          if (revAccum > 3) {                       // порог против дрожи пальца
-            const R0 = CONFIG.JOY.RADIUS, m = 6;
-            joyAnchor.x = Math.max(R0 + m, Math.min(CONFIG.CANVAS_W - R0 - m, cx));
-            revAccum = 0;
-          }
-        } else revAccum = 0;
-      }
-      lastFx = cx;
       const c = _joyCenter();
       const R = CONFIG.JOY.RADIUS;
       let dx = (cx - c.x) / R, dy = (cy - c.y) / R;
@@ -150,11 +118,11 @@ const Game = (() => {
       joy.dx = shape(dx);
       joy.dy = shape(dy);
     };
-    const joyRelease = () => { joy.active = false; joy.dx = 0; joy.dy = 0; joy.rawx = 0; joy.rawy = 0; joyAnchor = null; lastFx = null; revAccum = 0; };
+    const joyRelease = () => { joy.active = false; joy.dx = 0; joy.dy = 0; joy.rawx = 0; joy.rawy = 0; };
 
     const onStart = (cx, cy) => {
       const m = CONFIG.CONTROL_MODE;
-      if (m === 'joystick')      { _setJoyAnchor(cx, cy); joy.active = true; joy.dx = 0; joy.dy = 0; joy.rawx = 0; joy.rawy = 0; lastFx = cx; revAccum = 0; }
+      if (m === 'joystick')      joyMove(cx, cy);
       else if (m === 'strip')    stripTarget(cx);
       else if (m === 'relative') grab(cx);
       else                       Drone.setTarget(cx);
@@ -270,6 +238,9 @@ const Game = (() => {
     const r = CONFIG.DRONE_RADIUS;
     if (Drone.x - r < w.hitLeft || Drone.x + r > w.hitRight) {
       if (shieldTime <= 0) _crash();
+      // Со щитом дрон выживает, но сквозь породу не проходит: упираемся
+      // в стену, иначе щит превращался в режим полёта через камень
+      else Drone.clampInside(w.hitLeft + r, w.hitRight - r);
     }
   }
 
