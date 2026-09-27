@@ -34,27 +34,37 @@ const Canyon = (() => {
 
   // Параметры волны по её номеру: берём строку из таблицы,
   // после последней держим её же
-  function _waveParams(n) {
+  // Скорость падения на глубине — та же формула, что в игре. Нужна, чтобы
+  // перевести длительности фаз из секунд в метры прямо при постройке волны.
+  function _fallSpeedAt(d) {
+    return Math.min(CONFIG.FALL_SPEED_MAX,
+                    CONFIG.FALL_SPEED_START + CONFIG.FALL_ACCEL_PER_M * d);
+  }
+
+  function _waveParams(n, d) {
     const w = C.WAVES[Math.min(n, C.WAVES.length - 1)];
+    const v = _fallSpeedAt(d);
     return {
       minWidth: Math.max(C.MIN_WIDTH_FLOOR, _rnd(w.minWidth, C.JITTER)),
-      throatLen: _rnd(w.throatLen, C.JITTER),
-      restLen: _rnd(w.restLen, C.JITTER),
+      throatLen: _rnd(w.throatTime * v, C.JITTER),
+      restLen: _rnd(w.restTime * v, C.JITTER),
+      squeezeLen: _rnd(C.SQUEEZE_TIME * v, C.JITTER),
+      releaseLen: _rnd(C.RELEASE_TIME * v, C.JITTER),
     };
   }
 
   // Достраиваем волны, пока не покроем нужную глубину
   function _buildAhead(toDepth) {
     while (builtTo < toDepth) {
-      const p = _waveParams(waveIndex);
+      const p = _waveParams(waveIndex, builtTo);
 
       // Кто давит — решается один раз на волну, внутри не меняется:
       // игрок должен успеть прочитать сценарий
       const r = Math.random();
       const side = r < 0.38 ? SIDE.LEFT : (r < 0.76 ? SIDE.RIGHT : SIDE.BOTH);
 
-      const squeeze = _rnd(C.SQUEEZE_LEN, C.JITTER);
-      const release = _rnd(C.RELEASE_LEN, C.JITTER);
+      const squeeze = p.squeezeLen;
+      const release = p.releaseLen;
 
       let d = builtTo;
       waves.push({ from: d, to: d + squeeze, phase: PHASE.SQUEEZE, side, minWidth: p.minWidth }); d += squeeze;
@@ -81,11 +91,26 @@ const Canyon = (() => {
 
   const TAU = Math.PI * 2;
 
+  // Время падения до глубины d, аналитически. Скорость растёт линейно до
+  // потолка: v = v0 + a*d, пока не упрётся. Нужно, чтобы мерить изгибы
+  // русла в секундах, а не в метрах.
+  let _tCache = null;
+  function _timeAt(d) {
+    const v0 = CONFIG.FALL_SPEED_START, a = CONFIG.FALL_ACCEL_PER_M,
+          vm = CONFIG.FALL_SPEED_MAX;
+    if (!_tCache || _tCache.v0 !== v0) {
+      const dCap = (vm - v0) / a;
+      _tCache = { v0, dCap, tCap: Math.log(vm / v0) / a };
+    }
+    if (d <= _tCache.dCap) return Math.log((v0 + a * d) / v0) / a;
+    return _tCache.tCap + (d - _tCache.dCap) / vm;
+  }
+
   // ---- Слой 1: ось русла. Живёт независимо от ширины ----
   function axisAt(d) {
-    const A = C.AXIS;
-    return Math.sin(d * TAU / A.SLOW_PERIOD) * A.SLOW_AMP
-         + Math.sin(d * TAU / A.FAST_PERIOD + 1.7) * A.FAST_AMP;
+    const A = C.AXIS, t = _timeAt(d);
+    return Math.sin(t * TAU / A.SLOW_TIME) * A.SLOW_AMP
+         + Math.sin(t * TAU / A.FAST_TIME + 1.7) * A.FAST_AMP;
   }
 
   // ---- Слой 3: фактура. Всегда >= 0, стена только отступает ----
@@ -122,21 +147,32 @@ const Canyon = (() => {
     const full = C.WIDE_WIDTH;
     const margin = (W - full) / 2;
 
+    // Гасим наросты к границам фазы: там меняется правило их расстановки,
+    // и без затухания нарост исчезал скачком
+    const tf = (d - s.from) / (s.to - s.from);
+    const edge = Math.min(tf, 1 - tf) / C.PHASE_FADE;
+    const fade = _smooth(Math.max(0, Math.min(1, edge)));
+
     // Компенсация наростов
     let growL = 0, growR = 0;
     if (typeof Growth !== 'undefined') {
-      growL = Growth.reachAt(d, s.phase, 'left', s.side);
-      growR = Growth.reachAt(d, s.phase, 'right', s.side);
-      // Расстрелянные участки — наростов там больше нет
-      if (typeof Game !== 'undefined' && Game.isCleared) {
-        if (Game.isCleared(d, 'left'))  growL = 0;
-        if (Game.isCleared(d, 'right')) growR = 0;
-      }
+      growL = Growth.reachAt(d, s.phase, 'left', s.side, fade);
+      growR = Growth.reachAt(d, s.phase, 'right', s.side, fade);
+
+      // ВАЖНО: ширину считаем по НЕрасстрелянным наростам. Скала не
+      // сдвигается оттого, что игрок сшиб с неё нарост — иначе выстрел
+      // дёргал бы весь проход вбок.
       const eaten = growL + growR;
       if (eaten > 0) {
         // минимум, который обязан остаться чистым
         const need = CONFIG.DRONE_RADIUS * 2 + CONFIG.GROWTH.MIN_GAP;
         width = Math.max(width, need + eaten);
+      }
+
+      // Расстрелянные участки — наростов там больше нет, проход только шире
+      if (typeof Game !== 'undefined' && Game.isCleared) {
+        if (Game.isCleared(d, 'left'))  growL = 0;
+        if (Game.isCleared(d, 'right')) growR = 0;
       }
     }
 

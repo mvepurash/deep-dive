@@ -35,7 +35,12 @@ const Growth = (() => {
   // Есть ли нарост на этой глубине и насколько он торчит.
   // side: 'left' | 'right' — какую стену проверяем
   // pressing: какая стена давит в текущей волне (для правила фазы СЖАТИЕ)
-  function reachAt(depth, phase, side, pressing) {
+  // edgeFade (0..1) приходит от ущелья: он гаснет к границам фазы.
+  // Без него правило фазы меняется скачком, и нарост в 26 px исчезал за
+  // нулевое расстояние — проход дёргался вбок с бесконечной скоростью.
+  function reachAt(depth, phase, side, pressing, edgeFade) {
+    const fade = edgeFade === undefined ? 1 : edgeFade;
+    if (fade <= 0) return 0;
     const density = _densityAt(depth, phase);
     if (density <= 0) return 0;
 
@@ -55,14 +60,14 @@ const Growth = (() => {
     const local = (depth % G.SPACING) / G.SPACING;
     const shape = Math.sin(local * Math.PI);          // 0 -> 1 -> 0
     const size = 0.45 + 0.55 * _hash(slot * 3.7);     // разные по величине
-    return G.MAX_REACH * size * shape;
+    return G.MAX_REACH * size * shape * fade;
   }
 
   // Сколько места съедают наросты на этой глубине с обеих сторон.
   // Нужно ущелью, чтобы раздвинуться и сохранить обещанный проход.
-  function totalReachAt(depth, phase, pressing) {
-    return reachAt(depth, phase, 'left', pressing)
-         + reachAt(depth, phase, 'right', pressing);
+  function totalReachAt(depth, phase, pressing, edgeFade) {
+    return reachAt(depth, phase, 'left', pressing, edgeFade)
+         + reachAt(depth, phase, 'right', pressing, edgeFade);
   }
 
   return { reachAt, totalReachAt };
