@@ -18,6 +18,7 @@ const Drone = (() => {
     targetX = x;
     alive = true;
     desiredV = 0;
+    directMode = false;
   }
 
   // Цель ограничиваем краями: при относительном управлении палец можно
@@ -31,12 +32,18 @@ const Drone = (() => {
   // Скоростной режим (джойстик): отклонение стика напрямую задаёт желаемую
   // скорость. Позиционная цель при этом не используется.
   let velocityMode = false;
+  let directMode = false;          // позицию задаёт палец, интегрировать нечего
   let desiredV = 0;
-  function setVelocity(v) { velocityMode = true; desiredV = v; }
-  function setPositionMode() { velocityMode = false; }
+  function setVelocity(v) { velocityMode = true; directMode = false; desiredV = v; }
+  function setPositionMode() { velocityMode = false; directMode = false; }
 
   function update(dt) {
     if (!alive) return;
+
+    // Режим trackpad: позиция уже выставлена пальцем. Если здесь ещё раз
+    // проинтегрировать скорость, дрон уедет вторым шагом — тот самый
+    // «выбег», которого мы и добиваемся избежать.
+    if (directMode) return;
 
     if (velocityMode) {
       const mass = CONFIG.DRONE_MASS;
@@ -75,6 +82,15 @@ const Drone = (() => {
     if (x > CONFIG.CANVAS_W - r) { x = CONFIG.CANVAS_W - r; vx = 0; }
   }
 
+  // Прямая установка позиции (режим trackpad). Скорость держим как
+  // производную от перемещения — она нужна только для хвоста-следа
+  function setX(nx, dt) {
+    const r = CONFIG.DRONE_RADIUS;
+    const cl = Math.max(r, Math.min(CONFIG.CANVAS_W - r, nx));
+    if (dt > 0) vx = (cl - x) / dt;
+    x = cl; targetX = x; velocityMode = false; directMode = true;
+  }
+
   // Упереть дрон в границы коридора, погасив скорость в стену
   function clampInside(minX, maxX) {
     if (minX > maxX) { x = (minX + maxX) / 2; vx = 0; return; }
@@ -86,7 +102,7 @@ const Drone = (() => {
   function kill() { alive = false; }
 
   return {
-    reset, update, setTarget, setVelocity, setPositionMode, clampInside, kill,
+    reset, update, setTarget, setVelocity, setPositionMode, setX, clampInside, kill,
     get x() { return x; },
     get vx() { return vx; },
     get target() { return targetX; },

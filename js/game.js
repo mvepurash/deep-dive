@@ -12,7 +12,7 @@ const Game = (() => {
   let running = false;
   let lastTime = 0;
   let bestDepth = 0;
-  let joy = { active: false, dx: 0, dy: 0, rawx: 0, rawy: 0 };   // отклонение стика, -1..1
+  let joy = { active: false, dx: 0, dy: 0, rawx: 0, rawy: 0, steerDx: 0, lastFx: null };   // отклонение стика, -1..1
   let speedMod = 0;                             // -1 тормоз, +1 ускорение
   let energy = CONFIG.ENERGY.MAX;
   let regenDelay = 0;
@@ -99,6 +99,13 @@ const Game = (() => {
 
     // Джойстик: отклонение считаем от неподвижного центра площадки
     const joyMove = (cx, cy) => {
+      // Горизонталь в режиме trackpad — это перемещение пальца, а не
+      // отклонение: дрон идёт от своего текущего места, поэтому разворот
+      // действует сразу и «ловить» дрон не нужно
+      if (CONFIG.JOY.STEER === 'trackpad') {
+        if (joy.lastFx !== null) joy.steerDx = (cx - joy.lastFx) * CONFIG.JOY.STEER_SENS;
+        joy.lastFx = cx;
+      }
       const c = _joyCenter();
       const R = CONFIG.JOY.RADIUS;
       let dx = (cx - c.x) / R, dy = (cy - c.y) / R;
@@ -118,7 +125,7 @@ const Game = (() => {
       joy.dx = shape(dx);
       joy.dy = shape(dy);
     };
-    const joyRelease = () => { joy.active = false; joy.dx = 0; joy.dy = 0; joy.rawx = 0; joy.rawy = 0; };
+    const joyRelease = () => { joy.active = false; joy.dx = 0; joy.dy = 0; joy.rawx = 0; joy.rawy = 0; joy.steerDx = 0; joy.lastFx = null; };
 
     const onStart = (cx, cy) => {
       const m = CONFIG.CONTROL_MODE;
@@ -165,9 +172,16 @@ const Game = (() => {
   function update(dt) {
     if (!running) return;
 
-    // Джойстик: горизонталь задаёт скорость дрона, вертикаль — темп погружения
+    // Джойстик: горизонталь рулит, вертикаль задаёт темп погружения
     if (CONFIG.CONTROL_MODE === 'joystick') {
-      Drone.setVelocity(joy.dx * CONFIG.DRONE_MAX_SPEED);
+      if (CONFIG.JOY.STEER === 'trackpad') {
+        // Перемещение пальца переносим на дрон один в один и обнуляем:
+        // палец стоит — дрон стоит, никакого выбега и «ловли»
+        if (joy.steerDx !== 0) { Drone.setX(Drone.x + joy.steerDx, dt); joy.steerDx = 0; }
+        else Drone.setX(Drone.x, dt);
+      } else {
+        Drone.setVelocity(joy.dx * CONFIG.DRONE_MAX_SPEED);
+      }
       speedMod = -joy.dy;                 // палец вверх по стику = ускорение
     } else {
       Drone.setPositionMode();
@@ -391,7 +405,12 @@ const Game = (() => {
     // Ручка
     // Ручку рисуем по СЫРОМУ отклонению пальца, а не по усиленному:
     // иначе при GAIN>1 она упирается в край раньше, чем палец
-    const hx = c.x + (joy.rawx || 0) * R * 0.72;
+    // В режиме trackpad горизонталь ручки показывает положение дрона
+    // (отклонения пальца там попросту нет), вертикаль — тормоз/ускорение
+    const hrx = CONFIG.JOY.STEER === 'trackpad'
+      ? (Drone.x / CONFIG.CANVAS_W) * 2 - 1
+      : (joy.rawx || 0);
+    const hx = c.x + hrx * R * 0.72;
     const hy = c.y + (joy.rawy || 0) * R * 0.72;
     ctx.fillStyle = joy.active ? '#5fd8ff' : 'rgba(95,216,255,0.5)';
     ctx.shadowColor = 'rgba(95,216,255,0.9)';
