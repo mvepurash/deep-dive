@@ -234,8 +234,9 @@ const Game = (() => {
       }
     }
 
-    // Снаряды летят вниз, расчищают наросты на своём пути
-    const shotStep = CONFIG.PICKUP.SHOT_SPEED / PX_PER_M * dt;
+    // Снаряды летят строго вниз и всегда быстрее дрона: к скорости
+    // падения прибавляем собственную скорость снаряда
+    const shotStep = (fallSpeed + CONFIG.PICKUP.SHOT_SPEED / PX_PER_M) * dt;
     for (const sh of shots) {
       sh.depth += shotStep;
       const w = Canyon.getWalls(sh.depth);
@@ -310,12 +311,19 @@ const Game = (() => {
     }
     ctx.stroke();
 
-    // Снаряды
-    ctx.fillStyle = '#ff8a6e';
+    // Снаряды — вертикальный след, а не круглая искра
+    const SR = CONFIG.PICKUP.SHOT_RADIUS, SL = CONFIG.PICKUP.SHOT_LEN;
+    ctx.strokeStyle = '#ff8a6e';
+    ctx.lineWidth = SR * 2;
+    ctx.lineCap = 'round';
     for (const sh of shots) {
       const py = CONFIG.DRONE_Y + (sh.depth - depth - CONFIG.DRONE_Y / PX_PER_M) * PX_PER_M;
-      ctx.beginPath(); ctx.arc(sh.x, py, CONFIG.PICKUP.SHOT_RADIUS, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath();
+      ctx.moveTo(sh.x, py - SL);
+      ctx.lineTo(sh.x, py);
+      ctx.stroke();
     }
+    ctx.lineCap = 'butt';
 
     Pickups.draw(ctx, depth, PX_PER_M, CONFIG.DRONE_Y);
 
