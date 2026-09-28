@@ -222,6 +222,6 @@ const Canyon = (() => {
     };
   }
 
-  return { reset, getWalls, axisAt, PHASE, SIDE };
+  return { reset, getWalls, axisAt, timeAt: _timeAt, PHASE, SIDE };
 
 })();

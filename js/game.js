@@ -20,6 +20,7 @@ const Game = (() => {
   let weaponTime = 0;      // сколько ещё стреляет оружие
   let shotTimer = 0;
   let shots = [];          // {x, depth}
+  let _elapsed = 0;        // секунды с начала захода, для анимации стаи
   let cleared = [];        // расстрелянные наросты: {depth, side}
 
   // Сколько метров укладывается в высоту экрана — задаёт масштаб обзора
@@ -50,6 +51,8 @@ const Game = (() => {
     regenDelay = 0;
     shieldTime = 0; weaponTime = 0; shotTimer = 0;
     shots = []; cleared = [];
+    Swarm.reset();
+    _elapsed = 0;
     running = true;
   }
 
@@ -171,6 +174,7 @@ const Game = (() => {
 
   function update(dt) {
     if (!running) return;
+    _elapsed += dt;
 
     // Джойстик: горизонталь рулит, вертикаль задаёт темп погружения
     if (CONFIG.CONTROL_MODE === 'joystick') {
@@ -215,6 +219,7 @@ const Game = (() => {
     // Предметы всплывают навстречу
     const aheadDepth = depth + CONFIG.CANVAS_H / PX_PER_M;
     Pickups.update(depth, aheadDepth, dt);
+    Swarm.update(depth, aheadDepth, dt);
     const droneDepthNow = depth + (CONFIG.DRONE_Y / PX_PER_M);
     for (const type of Pickups.collect(Drone.x, droneDepthNow, PX_PER_M)) {
       if (type === 'energy') energy = Math.min(CONFIG.ENERGY.MAX, energy + CONFIG.PICKUP.ENERGY_GAIN);
@@ -239,6 +244,9 @@ const Game = (() => {
     const shotStep = (fallSpeed + CONFIG.PICKUP.SHOT_SPEED / PX_PER_M) * dt;
     for (const sh of shots) {
       sh.depth += shotStep;
+      // Снаряд сбивает одну особь и гаснет. Разогнать этим стаю нельзя —
+      // девять выстрелов в секунду против полутора десятков особей
+      if (Swarm.shootAt(sh.x, sh.depth, PX_PER_M)) { sh.dead = true; continue; }
       const w = Canyon.getWalls(sh.depth);
       if (sh.x <= w.hitLeft)  { cleared.push({ depth: sh.depth, side: 'left'  }); sh.dead = true; }
       if (sh.x >= w.hitRight) { cleared.push({ depth: sh.depth, side: 'right' }); sh.dead = true; }
@@ -256,6 +264,13 @@ const Game = (() => {
       // Со щитом дрон выживает, но сквозь породу не проходит: упираемся
       // в стену, иначе щит превращался в режим полёта через камень
       else Drone.clampInside(w.hitLeft + r, w.hitRight - r);
+    }
+
+    // Столкновение со стаей. Щит спасает, как и от стены, но особь при
+    // этом гибнет — иначе дрон со щитом застревал бы в косяке
+    if (Swarm.hitTest(Drone.x, droneDepth, PX_PER_M)) {
+      if (shieldTime <= 0) _crash();
+      else Swarm.shootAt(Drone.x, droneDepth, PX_PER_M);
     }
   }
 
@@ -326,6 +341,7 @@ const Game = (() => {
     ctx.lineCap = 'butt';
 
     Pickups.draw(ctx, depth, PX_PER_M, CONFIG.DRONE_Y);
+    Swarm.draw(ctx, depth, PX_PER_M, _elapsed);
 
     // Дрон — пока просто круг
     ctx.fillStyle = Drone.alive ? '#5fd8ff' : '#ff4444';
