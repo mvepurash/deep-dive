@@ -56,9 +56,13 @@ const Growth = (() => {
     const r = _hash(slot);
     if (r > density) return 0;
 
-    // Насколько торчит: плавно нарастает и спадает внутри своего слота
+    // Насколько торчит: плавно нарастает и спадает внутри СВОЕЙ ЧАСТИ слота,
+    // а не всего слота — иначе нарост размазан на 138 px вдоль стены
     const local = (depth % G.SPACING) / G.SPACING;
-    const shape = Math.sin(local * Math.PI);          // 0 -> 1 -> 0
+    const W = G.WIDTH_FRAC;
+    const t = (local - (1 - W) / 2) / W;              // 0..1 внутри нароста
+    if (t <= 0 || t >= 1) return 0;
+    const shape = Math.sin(t * Math.PI);              // 0 -> 1 -> 0
     const size = 0.45 + 0.55 * _hash(slot * 3.7);     // разные по величине
     return G.MAX_REACH * size * shape * fade;
   }
