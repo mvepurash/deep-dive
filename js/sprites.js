@@ -27,6 +27,9 @@ const Sprites = (() => {
 
   const LIST = {
     coral_01:  'assets/creatures/coral_01.png',
+    coral_02:  'assets/creatures/coral_02.png',
+    coral_03:  'assets/creatures/coral_03.png',
+    coral_04:  'assets/creatures/coral_04.png',
     razor_01:  'assets/creatures/razor_01.png',
     wall_rock: 'assets/env/wall_rock.webp',
   };

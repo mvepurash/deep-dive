@@ -24,6 +24,24 @@ const Growth = (() => {
     return s - Math.floor(s);
   }
 
+  // Какой из четырёх кораллов растёт в этом слоте. Один и тот же слот
+  // всегда даёт один и тот же вид — иначе нарост менял бы облик и форму
+  // хитбокса на ходу.
+  function variantOf(slot) {
+    return Math.floor(_hash(slot * 11.31) * G.PROFILES.length) % G.PROFILES.length;
+  }
+
+  // Вылет как доля от полного, по огибающей конкретного спрайта.
+  // Линейно между 25 узлами: хитбокс обязан совпадать с картинкой, а не
+  // быть похожим на неё.
+  function _profile(v, t) {
+    const P = G.PROFILES[v];
+    const n = P.length - 1;
+    const x = Math.max(0, Math.min(n, t * n));
+    const i = Math.min(n - 1, Math.floor(x));
+    return P[i] + (P[i + 1] - P[i]) * (x - i);
+  }
+
   // Плотность растёт с глубиной, но не превышает потолок фазы
   function _densityAt(depth, phase) {
     const base = G.DENSITY[phase] ?? 0;
@@ -62,7 +80,7 @@ const Growth = (() => {
     const W = G.WIDTH_FRAC;
     const t = (local - (1 - W) / 2) / W;              // 0..1 внутри нароста
     if (t <= 0 || t >= 1) return 0;
-    const shape = Math.sin(t * Math.PI);              // 0 -> 1 -> 0
+    const shape = _profile(variantOf(slot), t);       // огибающая своего спрайта
     const size = 0.45 + 0.55 * _hash(slot * 3.7);     // разные по величине
     return G.MAX_REACH * size * shape * fade;
   }
@@ -90,9 +108,18 @@ const Growth = (() => {
     const W = G.WIDTH_FRAC;
     const t = (local - (1 - W) / 2) / W;
     if (t <= 0 || t >= 1) return null;
-    return { slot: n, centerDepth: (n + 0.5) * G.SPACING, t };
+    // Ключ слота обязан совпадать с тем, что считает reachAt: у правой
+    // стены своя серия, и без сдвига картинка берёт один вид коралла, а
+    // хитбокс — другой. Ровно это и показал замер: расхождение 10 px
+    // на правой стене при нуле на левой.
+    return { slot: n + (side === 'left' ? 0 : 7919),
+             centerDepth: (n + 0.5) * G.SPACING, t };
   }
 
-  return { reachAt, totalReachAt, slotInfo, SPAN_M };
+  // Форма нароста в этой точке — та же, что использует хитбокс.
+  // Отрисовка обязана спрашивать её здесь, а не считать по-своему.
+  function shapeAt(slot, t) { return _profile(variantOf(slot), t); }
+
+  return { reachAt, totalReachAt, slotInfo, variantOf, shapeAt, SPAN_M };
 
 })();

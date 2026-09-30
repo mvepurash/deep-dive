@@ -38,8 +38,10 @@ const Game = (() => {
     // Не ждём: фигуры рисуются, пока картинки едут. Размеры отдаём сразу,
     // чтобы уменьшенные копии готовились при загрузке, а не в кадре
     Sprites.load([
-      { name: 'coral_01', w: CONFIG.GROWTH.MAX_REACH, h: Growth.SPAN_M * PX_PER_M },
-      { name: 'coral_01', w: CONFIG.GROWTH.MAX_REACH, h: Growth.SPAN_M * PX_PER_M, flip: true },
+      ...['coral_01', 'coral_02', 'coral_03', 'coral_04'].flatMap(n => [
+        { name: n, w: CONFIG.GROWTH.MAX_REACH, h: Growth.SPAN_M * PX_PER_M },
+        { name: n, w: CONFIG.GROWTH.MAX_REACH, h: Growth.SPAN_M * PX_PER_M, flip: true },
+      ]),
       { name: 'razor_01', h: CONFIG.SWARM.RADIUS * 2, swim: true },
       { name: 'wall_rock', h: 1, tint: 1.00 },
       { name: 'wall_rock', h: 1, tint: 0.55 },   // второй слой, ломает повтор
@@ -317,9 +319,8 @@ const Game = (() => {
     // нароста. Дальше он уменьшается не более чем вдвое, а такое
     // уменьшение браузер делает без потерь
     const spanPx = Growth.SPAN_M * PX_PER_M;
-    const img = Sprites.at('coral_01', CONFIG.GROWTH.MAX_REACH, spanPx, false);
-    const mir = Sprites.at('coral_01', CONFIG.GROWTH.MAX_REACH, spanPx, true);
-    if (!img) ctx.fillStyle = '#2d5a3a';
+    const ready = Sprites.raw('coral_01') !== null;
+    if (!ready) ctx.fillStyle = '#2d5a3a';
 
     for (let py = 0; py <= CONFIG.CANVAS_H; py += STEP) {
       const d = depth + py / PX_PER_M;
@@ -330,7 +331,7 @@ const Game = (() => {
         const reach = left ? w.growL : w.growR;
         if (reach <= 0.5) continue;
 
-        if (!img) {                                   // откат: пока не загрузилось
+        if (!ready) {                                 // откат: пока не загрузилось
           ctx.fillRect(left ? w.left : w.right - reach, py, reach, STEP);
           continue;
         }
@@ -338,20 +339,33 @@ const Game = (() => {
         const si = Growth.slotInfo(d, left ? 'left' : 'right');
         if (!si) continue;
 
-        const key = (left ? 'L' : 'R') + si.slot;
-        let ref = _reachCache.get(key);
-        if (ref === undefined) {
-          const wc = Canyon.getWalls(si.centerDepth);
-          ref = left ? wc.growL : wc.growR;
-          _reachCache.set(key, ref);
-        }
-        if (ref <= 0.5) continue;
+        // Вид коралла берём у Growth, а не выбираем заново: хитбокс уже
+        // посчитан по огибающей ЭТОГО вида, и вторая монетка развела бы
+        // картинку со смертью
+        const name = 'coral_0' + (Growth.variantOf(si.slot) + 1);
+        const img = Sprites.at(name, CONFIG.GROWTH.MAX_REACH, spanPx, false);
+        const mir = Sprites.at(name, CONFIG.GROWTH.MAX_REACH, spanPx, true);
+        if (!img || !mir) continue;
 
-        // Затухание к границам фазы середина нароста не видит — она своя
-        // на весь нарост. Возвращаем его отношением фактического хитбокса
-        // к идеальному синусу на этой же глубине.
-        const s = Math.sin(Math.PI * si.t);
-        const dw = s > 0.05 ? ref * Math.min(1, reach / (ref * s)) : ref;
+        const key = (left ? 'L' : 'R') + si.slot;
+        let full = _reachCache.get(key);
+        if (full === undefined) {
+          const wc = Canyon.getWalls(si.centerDepth);
+          const ref = left ? wc.growL : wc.growR;
+          // ref — вылет в середине нароста, а у огибающей там не
+          // обязательно максимум. Делим на форму и получаем полную
+          // ширину спрайта, ту самую, что отвечает MAX_REACH
+          const p0 = Growth.shapeAt(si.slot, 0.5);
+          full = p0 > 0.05 ? ref / p0 : ref;
+          _reachCache.set(key, full);
+        }
+        if (full <= 0.5) continue;
+
+        // Сужение к краям даёт сам силуэт, поэтому ширину полосы берём
+        // полную, деля хитбокс на форму. Так картинка повторяет затухание
+        // к границам фазы, не применяя форму дважды.
+        const pt = Growth.shapeAt(si.slot, si.t);
+        const dw = pt > 0.05 ? Math.min(full, reach / pt) : full;
 
         const srcY = si.t * img.height;
         const srcH = Math.max(1, (STEP / spanPx) * img.height);
