@@ -47,7 +47,8 @@ const Sprites = (() => {
         for (const p of prewarm) {
           if (p.name !== name) continue;
           const w = p.w || p.h * im.width / im.height;
-          at(name, w, p.h, !!p.flip);
+          if (p.swim) { at(name, w, p.h, false); at(name, w, p.h, true); mid(name, w, p.h); }
+          else        { at(name, w, p.h, !!p.flip); }
         }
       };
       im.onerror = () => { failed++; };   // молча: откат сделает своё дело
@@ -86,8 +87,48 @@ const Sprites = (() => {
     return out;
   }
 
+  // Ровная поза: попиксельное среднее между спрайтом и его зеркалом.
+  //
+  // Нужна для плавания. Если просто чередовать картинку и зеркало, тварь
+  // перекидывает из крена в крен рывком — это мигание, а не движение.
+  // Среднее даёт промежуточный кадр, и цикл становится четырёхтактным:
+  // крен влево, ровно, крен вправо, ровно.
+  //
+  // Усреднять надо в ПРЕМУЛЬТИПЛИЦИРОВАННОМ виде. Если брать среднее от
+  // обычного цвета, там где один кадр прозрачен, а другой нет, в
+  // результат подмешается цвет пустоты и по краям пойдёт грязь.
+  function mid(name, w, h) {
+    const a = at(name, w, h, false), b = at(name, w, h, true);
+    if (!a || !b) return null;
+    const key = name + '|' + a.width + 'x' + a.height + '|mid';
+    if (cache[key]) return cache[key];
+
+    try {
+      const da = a.getContext('2d').getImageData(0, 0, a.width, a.height).data;
+      const db = b.getContext('2d').getImageData(0, 0, b.width, b.height).data;
+      const c = document.createElement('canvas');
+      c.width = a.width; c.height = a.height;
+      const g = c.getContext('2d');
+      const out = g.createImageData(a.width, a.height);
+      for (let i = 0; i < da.length; i += 4) {
+        const aa = da[i + 3] / 255, ab = db[i + 3] / 255;
+        const A = (aa + ab) / 2;
+        out.data[i + 3] = Math.round(A * 255);
+        for (let k = 0; k < 3; k++) {
+          const pm = (da[i + k] * aa + db[i + k] * ab) / 2;
+          out.data[i + k] = A > 0 ? Math.min(255, Math.round(pm / A)) : 0;
+        }
+      }
+      g.putImageData(out, 0, 0);
+      cache[key] = c;
+      return c;
+    } catch (e) {
+      return a;            // холст закрыт для чтения — плаваем без ровной позы
+    }
+  }
+
   function stats() { return { loaded, failed, total: Object.keys(LIST).length, mips: Object.keys(cache).length }; }
 
-  return { load, raw, at, stats };
+  return { load, raw, at, mid, stats };
 
 })();

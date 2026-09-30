@@ -158,14 +158,19 @@ const Swarm = (() => {
         if (py < -30 || py > CONFIG.CANVAS_H + 30) continue;
         const geom = _geom(g, rd);
         if (!_alive(g, r, geom)) continue;
-        // Лёгкое рыскание — косяк должен выглядеть живым, а не сеткой
-        const sway = Math.sin(time * 6 + r.phase) * 3;
-        const x = _razorX(r, geom) + sway;
+        // Взмах: от него идёт и снос вбок, и выбор кадра. Фаза у каждой
+        // особи своя, иначе весь косяк мигает разом и это читается как
+        // сбой картинки, а не как стая
+        const beat = Math.sin(time * S.SWIM_RATE + r.phase);
+        const x = _razorX(r, geom) + beat * S.SWAY_PX;
 
         const src = Sprites.raw('razor_01');
         const h = S.RADIUS * 2;
         const wq = src ? Math.round(h * src.width / src.height) : 0;
-        const img = src ? Sprites.at('razor_01', wq, h, false) : null;
+        const img = !src ? null
+          : beat >  S.LEAN_GATE ? Sprites.at('razor_01', wq, h, true)
+          : beat < -S.LEAN_GATE ? Sprites.at('razor_01', wq, h, false)
+          :                       Sprites.mid('razor_01', wq, h);
         if (img) {
           // Спрайт вписан в круг радиуса RADIUS целиком: замерено, что ни
           // один плотный пиксель не выходит за хитбокс. Значит видимое и

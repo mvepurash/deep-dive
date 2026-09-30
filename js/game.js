@@ -40,7 +40,7 @@ const Game = (() => {
     Sprites.load([
       { name: 'coral_01', w: CONFIG.GROWTH.MAX_REACH, h: Growth.SPAN_M * PX_PER_M },
       { name: 'coral_01', w: CONFIG.GROWTH.MAX_REACH, h: Growth.SPAN_M * PX_PER_M, flip: true },
-      { name: 'razor_01', h: CONFIG.SWARM.RADIUS * 2 },
+      { name: 'razor_01', h: CONFIG.SWARM.RADIUS * 2, swim: true },
     ]);
     _bindInput();
     start();
