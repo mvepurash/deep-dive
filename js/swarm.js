@@ -162,21 +162,32 @@ const Swarm = (() => {
         const sway = Math.sin(time * 6 + r.phase) * 3;
         const x = _razorX(r, geom) + sway;
 
-        ctx.save();
-        ctx.translate(x, py);
-        ctx.fillStyle = '#c9d9e2';
-        ctx.beginPath();                    // клин носом вверх: они всплывают
-        ctx.moveTo(0, -S.RADIUS);
-        ctx.lineTo(S.RADIUS * 0.62, S.RADIUS * 0.8);
-        ctx.lineTo(0, S.RADIUS * 0.35);
-        ctx.lineTo(-S.RADIUS * 0.62, S.RADIUS * 0.8);
-        ctx.closePath();
-        ctx.fill();
-        ctx.fillStyle = '#5fd8ff';          // глаз-огонёк
-        ctx.beginPath();
-        ctx.arc(0, -S.RADIUS * 0.25, 1.6, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.restore();
+        const src = Sprites.raw('razor_01');
+        const h = S.RADIUS * 2;
+        const wq = src ? Math.round(h * src.width / src.height) : 0;
+        const img = src ? Sprites.at('razor_01', wq, h, false) : null;
+        if (img) {
+          // Спрайт вписан в круг радиуса RADIUS целиком: замерено, что ни
+          // один плотный пиксель не выходит за хитбокс. Значит видимое и
+          // смертельное совпадают, и «убило непонятно чем» тут быть не может
+          ctx.drawImage(img, x - wq / 2, py - h / 2);
+        } else {
+          ctx.save();                       // откат: пока картинка не загрузилась
+          ctx.translate(x, py);
+          ctx.fillStyle = '#c9d9e2';
+          ctx.beginPath();                  // клин носом вверх: они всплывают
+          ctx.moveTo(0, -S.RADIUS);
+          ctx.lineTo(S.RADIUS * 0.62, S.RADIUS * 0.8);
+          ctx.lineTo(0, S.RADIUS * 0.35);
+          ctx.lineTo(-S.RADIUS * 0.62, S.RADIUS * 0.8);
+          ctx.closePath();
+          ctx.fill();
+          ctx.fillStyle = '#5fd8ff';        // глаз-огонёк
+          ctx.beginPath();
+          ctx.arc(0, -S.RADIUS * 0.25, 1.6, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.restore();
+        }
       }
     }
   }

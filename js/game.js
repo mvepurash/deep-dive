@@ -35,6 +35,13 @@ const Game = (() => {
 
     try { bestDepth = parseInt(localStorage.getItem('dd_best') || '0', 10); } catch (e) {}
 
+    // Не ждём: фигуры рисуются, пока картинки едут. Размеры отдаём сразу,
+    // чтобы уменьшенные копии готовились при загрузке, а не в кадре
+    Sprites.load([
+      { name: 'coral_01', w: CONFIG.GROWTH.MAX_REACH, h: Growth.SPAN_M * PX_PER_M },
+      { name: 'coral_01', w: CONFIG.GROWTH.MAX_REACH, h: Growth.SPAN_M * PX_PER_M, flip: true },
+      { name: 'razor_01', h: CONFIG.SWARM.RADIUS * 2 },
+    ]);
     _bindInput();
     start();
     lastTime = performance.now();
@@ -284,6 +291,77 @@ const Game = (() => {
     setTimeout(start, 900);
   }
 
+  // Наросты на стенах.
+  //
+  // Спрайт один на весь нарост, но рисуется он полосами — теми же, что и
+  // стены. Причина не в красоте: за 69 px высоты стена успевает уйти вбок
+  // на полтора десятка пикселей, и нарост, посаженный одной картинкой,
+  // отклеился бы от породы. Полосами он остаётся приклеенным к стене.
+  //
+  // Ширину берём в СЕРЕДИНЕ нароста и оттуда масштабируем всю картинку:
+  // сужение к краям даёт сам силуэт. Если бы мы ещё и ширину полосы брали
+  // по её собственной глубине, синус применился бы дважды и нарост
+  // превратился бы в иглу.
+  //
+  // Полоса, у которой хитбокс нулевой, не рисуется вовсе. Так отрисовка
+  // бесплатно наследует всё поведение столкновений: затухание к границам
+  // фазы, правило «на сжатии только на недавящей стене» и расстрелянные
+  // выстрелом участки.
+  const _reachCache = new Map();
+
+  function _drawGrowths(STEP) {
+    _reachCache.clear();
+    // Готовим коралл сразу в игровом размере: полный вылет на высоту
+    // нароста. Дальше он уменьшается не более чем вдвое, а такое
+    // уменьшение браузер делает без потерь
+    const spanPx = Growth.SPAN_M * PX_PER_M;
+    const img = Sprites.at('coral_01', CONFIG.GROWTH.MAX_REACH, spanPx, false);
+    const mir = Sprites.at('coral_01', CONFIG.GROWTH.MAX_REACH, spanPx, true);
+    if (!img) ctx.fillStyle = '#2d5a3a';
+
+    for (let py = 0; py <= CONFIG.CANVAS_H; py += STEP) {
+      const d = depth + py / PX_PER_M;
+      const w = Canyon.getWalls(d);
+
+      for (let k = 0; k < 2; k++) {
+        const left = k === 0;
+        const reach = left ? w.growL : w.growR;
+        if (reach <= 0.5) continue;
+
+        if (!img) {                                   // откат: пока не загрузилось
+          ctx.fillRect(left ? w.left : w.right - reach, py, reach, STEP);
+          continue;
+        }
+
+        const si = Growth.slotInfo(d, left ? 'left' : 'right');
+        if (!si) continue;
+
+        const key = (left ? 'L' : 'R') + si.slot;
+        let ref = _reachCache.get(key);
+        if (ref === undefined) {
+          const wc = Canyon.getWalls(si.centerDepth);
+          ref = left ? wc.growL : wc.growR;
+          _reachCache.set(key, ref);
+        }
+        if (ref <= 0.5) continue;
+
+        // Затухание к границам фазы середина нароста не видит — она своя
+        // на весь нарост. Возвращаем его отношением фактического хитбокса
+        // к идеальному синусу на этой же глубине.
+        const s = Math.sin(Math.PI * si.t);
+        const dw = s > 0.05 ? ref * Math.min(1, reach / (ref * s)) : ref;
+
+        const srcY = si.t * img.height;
+        const srcH = Math.max(1, (STEP / spanPx) * img.height);
+        if (left) {
+          ctx.drawImage(img, 0, srcY, img.width, srcH, w.left, py, dw, STEP);
+        } else {
+          ctx.drawImage(mir, 0, srcY, mir.width, srcH, w.right - dw, py, dw, STEP);
+        }
+      }
+    }
+  }
+
   function draw() {
     // Фон — тем темнее, чем глубже
     const dark = Math.min(0.75, depth / 4000);
@@ -303,14 +381,7 @@ const Game = (() => {
       ctx.fillRect(w.right, py, CONFIG.CANVAS_W - w.right, STEP);
     }
 
-    // Наросты на стенах — пока просто выступы другого цвета
-    ctx.fillStyle = '#2d5a3a';
-    for (let py = 0; py <= CONFIG.CANVAS_H; py += STEP) {
-      const d = depth + py / PX_PER_M;
-      const w = Canyon.getWalls(d);
-      if (w.growL > 0.5) ctx.fillRect(w.left, py, w.growL, STEP);
-      if (w.growR > 0.5) ctx.fillRect(w.right - w.growR, py, w.growR, STEP);
-    }
+    _drawGrowths(STEP);
 
     // Контур прохода
     ctx.beginPath();
@@ -525,6 +596,10 @@ const Game = (() => {
     return false;
   }
 
-  return { start, isCleared };
+  // depth наружу — только на чтение. Он нужен проверкам: без него
+  // автопилот не знает, где находится, а вся приёмка в этом проекте
+  // держится на прогонах автопилота, а не на впечатлении от кадра.
+  return { start, isCleared, get depth() { return depth; },
+                             get droneDepth() { return depth + CONFIG.DRONE_Y / PX_PER_M; } };
 
 })();

@@ -74,6 +74,25 @@ const Growth = (() => {
          + reachAt(depth, phase, 'right', pressing, edgeFade);
   }
 
-  return { reachAt, totalReachAt };
+  // К какому наросту относится эта глубина и где мы внутри него.
+  // Нужно отрисовке: спрайт коралла один на весь нарост, а рисуем мы
+  // полосами по 4 px, и каждой полосе надо знать свою строку в картинке.
+  //
+  // t — та же величина, что и в reachAt: 0 у верхнего края нароста,
+  // 1 у нижнего. Если бы отрисовка считала её по-своему, картинка
+  // разъехалась бы с хитбоксом, и это вылезло бы не сразу.
+  // Высота нароста в метрах: своя часть слота, а не весь слот
+  const SPAN_M = G.SPACING * G.WIDTH_FRAC;
+
+  function slotInfo(depth, side) {
+    const n = Math.floor(depth / G.SPACING);
+    const local = depth / G.SPACING - n;
+    const W = G.WIDTH_FRAC;
+    const t = (local - (1 - W) / 2) / W;
+    if (t <= 0 || t >= 1) return null;
+    return { slot: n, centerDepth: (n + 0.5) * G.SPACING, t };
+  }
+
+  return { reachAt, totalReachAt, slotInfo, SPAN_M };
 
 })();
