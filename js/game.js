@@ -41,6 +41,8 @@ const Game = (() => {
       { name: 'coral_01', w: CONFIG.GROWTH.MAX_REACH, h: Growth.SPAN_M * PX_PER_M },
       { name: 'coral_01', w: CONFIG.GROWTH.MAX_REACH, h: Growth.SPAN_M * PX_PER_M, flip: true },
       { name: 'razor_01', h: CONFIG.SWARM.RADIUS * 2, swim: true },
+      { name: 'wall_rock', h: 1, tint: 1.00 },
+      { name: 'wall_rock', h: 1, tint: 0.55 },   // второй слой, ломает повтор
     ]);
     _bindInput();
     start();
@@ -362,24 +364,80 @@ const Game = (() => {
     }
   }
 
+  // Стены.
+  //
+  // Порода не рисуется полосами, как наросты: полос 214, и на каждую
+  // пришлось бы по два drawImage. Вместо этого строим контур стены,
+  // обрезаем по нему и заливаем узором — две заливки на кадр вместо
+  // четырёхсот вызовов.
+  //
+  // Слоёв два, и это не украшение. Тайл 1024 px высотой на скорости
+  // 320 м/с повторяется раз в 1.3 секунды, и повтор видно. Второй слой
+  // идёт в другом масштабе и с другой скоростью, поэтому узор перестаёт
+  // совпадать сам с собой.
+  //
+  // Сдвиг по горизонтали привязан к оси ущелья: иначе порода стоит на
+  // месте, пока стена от неё уезжает, и камень выглядит нарисованным
+  // на заднике, а не стеной.
+  let _pat = null, _pat2 = null;
+
+  function _wallPath(STEP) {
+    const p = new Path2D();
+    p.moveTo(0, 0);
+    for (let py = 0; py <= CONFIG.CANVAS_H; py += STEP) p.lineTo(Canyon.getWalls(depth + py / PX_PER_M).left, py);
+    p.lineTo(0, CONFIG.CANVAS_H); p.closePath();
+    p.moveTo(CONFIG.CANVAS_W, 0);
+    for (let py = 0; py <= CONFIG.CANVAS_H; py += STEP) p.lineTo(Canyon.getWalls(depth + py / PX_PER_M).right, py);
+    p.lineTo(CONFIG.CANVAS_W, CONFIG.CANVAS_H); p.closePath();
+    return p;
+  }
+
+  function _drawWalls(STEP, dark) {
+    const path = _wallPath(STEP);
+    const near = Sprites.tinted('wall_rock', 1.00);
+    const far  = Sprites.tinted('wall_rock', 0.55);
+
+    if (!near) {                       // откат: пока текстура не доехала
+      ctx.save(); ctx.fillStyle = '#0a1a24'; ctx.fill(path); ctx.restore();
+      return;
+    }
+    if (!_pat)  _pat  = ctx.createPattern(near, 'repeat');
+    if (!_pat2 && far) _pat2 = ctx.createPattern(far, 'repeat');
+
+    // Порода обязана темнеть вместе с водой. Фон уже нарисован и уже
+    // потемнел по глубине; проступая сквозь неполную непрозрачность,
+    // он утягивает за собой и камень. Без этого на 5 км стены светятся
+    // на фоне почти чёрной воды — яркость камня 21 против 7 у воды.
+    const fade = 1 - dark * 0.85;
+    const axis = Canyon.axisAt(depth);
+    const oy = depth * PX_PER_M;
+    ctx.save();
+    ctx.clip(path);
+    ctx.globalAlpha = fade;
+    ctx.translate(-axis % near.width, -oy % near.height);
+    ctx.fillStyle = _pat;
+    ctx.fillRect(0, 0, CONFIG.CANVAS_W + near.width, CONFIG.CANVAS_H + near.height);
+    ctx.restore();
+
+    if (_pat2) {
+      ctx.save();
+      ctx.clip(path);
+      ctx.globalAlpha = 0.30 * fade;
+      ctx.translate(-axis * 0.6 % far.width, -oy * 0.85 % far.height);
+      ctx.fillStyle = _pat2;
+      ctx.fillRect(0, 0, CONFIG.CANVAS_W + far.width, CONFIG.CANVAS_H + far.height);
+      ctx.restore();
+    }
+  }
+
   function draw() {
     // Фон — тем темнее, чем глубже
     const dark = Math.min(0.75, depth / 4000);
     ctx.fillStyle = `rgb(${Math.round(12 * (1 - dark))},${Math.round(30 * (1 - dark))},${Math.round(48 * (1 - dark))})`;
     ctx.fillRect(0, 0, CONFIG.CANVAS_W, CONFIG.CANVAS_H);
 
-    // Стены: идём сверху вниз, каждую полосу считаем по своей глубине
     const STEP = 4;
-    ctx.fillStyle = '#0a1a24';
-    ctx.strokeStyle = '#1d5f7a';
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    for (let py = 0; py <= CONFIG.CANVAS_H; py += STEP) {
-      const d = depth + py / PX_PER_M;
-      const w = Canyon.getWalls(d);
-      ctx.fillRect(0, py, w.left, STEP);
-      ctx.fillRect(w.right, py, CONFIG.CANVAS_W - w.right, STEP);
-    }
+    _drawWalls(STEP, dark);
 
     _drawGrowths(STEP);
 

@@ -26,8 +26,9 @@
 const Sprites = (() => {
 
   const LIST = {
-    coral_01: 'assets/creatures/coral_01.png',
-    razor_01: 'assets/creatures/razor_01.png',
+    coral_01:  'assets/creatures/coral_01.png',
+    razor_01:  'assets/creatures/razor_01.png',
+    wall_rock: 'assets/env/wall_rock.webp',
   };
 
   const imgs = {};
@@ -47,8 +48,9 @@ const Sprites = (() => {
         for (const p of prewarm) {
           if (p.name !== name) continue;
           const w = p.w || p.h * im.width / im.height;
-          if (p.swim) { at(name, w, p.h, false); at(name, w, p.h, true); mid(name, w, p.h); }
-          else        { at(name, w, p.h, !!p.flip); }
+          if (p.tint)      tinted(name, p.tint);
+          else if (p.swim) { at(name, w, p.h, false); at(name, w, p.h, true); mid(name, w, p.h); }
+          else             at(name, w, p.h, !!p.flip);
         }
       };
       im.onerror = () => { failed++; };   // молча: откат сделает своё дело
@@ -127,8 +129,45 @@ const Sprites = (() => {
     }
   }
 
+  // Тонированная копия серой текстуры.
+  //
+  // Порода приходит серой намеренно: тонировать её кодом дешевле, чем
+  // просить вторую картинку на каждую глубину. Средняя яркость исходника
+  // 66 из 255 — для стены на глубине это светло, тварь на таком фоне
+  // потеряется. Степень 1.25 гасит блики сильнее теней, дальше линейно
+  // разводим по холодному синему.
+  //
+  // Считается один раз при загрузке: 512x1024 — это полмиллиона пикселей,
+  // в кадре такое делать нельзя.
+  function tinted(name, scale) {
+    const im = imgs[name];
+    if (!im) return null;
+    const key = name + '|tint' + scale;
+    if (cache[key]) return cache[key];
+
+    const w = Math.max(1, Math.round(im.width * scale));
+    const h = Math.max(1, Math.round(im.height * scale));
+    const c = document.createElement('canvas');
+    c.width = w; c.height = h;
+    const g = c.getContext('2d');
+    g.drawImage(im, 0, 0, w, h);
+    try {
+      const d = g.getImageData(0, 0, w, h);
+      const p = d.data;
+      for (let i = 0; i < p.length; i += 4) {
+        const v = 255 * Math.pow(p[i] / 255, 1.25);
+        p[i]     = Math.max(0, Math.min(255, 16 + (v - 72) / 255 * 62));
+        p[i + 1] = Math.max(0, Math.min(255, 30 + (v - 72) / 255 * 70));
+        p[i + 2] = Math.max(0, Math.min(255, 40 + (v - 72) / 255 * 78));
+      }
+      g.putImageData(d, 0, 0);
+    } catch (e) { /* холст закрыт для чтения — останется серой */ }
+    cache[key] = c;
+    return c;
+  }
+
   function stats() { return { loaded, failed, total: Object.keys(LIST).length, mips: Object.keys(cache).length }; }
 
-  return { load, raw, at, mid, stats };
+  return { load, raw, at, mid, tinted, stats };
 
 })();
