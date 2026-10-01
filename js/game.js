@@ -43,6 +43,8 @@ const Game = (() => {
         { name: n, w: CONFIG.GROWTH.MAX_REACH, h: Growth.SPAN_M * PX_PER_M, flip: true },
       ]),
       { name: 'razor_01', h: CONFIG.SWARM.RADIUS * 2, swim: true },
+      { name: 'nest_base', w: CONFIG.NEST.BASE_OUT, h: CONFIG.NEST.BASE_PX },
+      { name: 'nest_base', w: CONFIG.NEST.BASE_OUT, h: CONFIG.NEST.BASE_PX, flip: true },
       { name: 'wall_rock', h: 1, tint: 1.00 },
       { name: 'wall_rock', h: 1, tint: 0.55 },   // второй слой, ломает повтор
     ]);
@@ -63,6 +65,7 @@ const Game = (() => {
     shieldTime = 0; weaponTime = 0; shotTimer = 0;
     shots = []; cleared = [];
     Swarm.reset();
+    Nest.reset();
     _elapsed = 0;
     running = true;
   }
@@ -231,6 +234,7 @@ const Game = (() => {
     const aheadDepth = depth + CONFIG.CANVAS_H / PX_PER_M;
     Pickups.update(depth, aheadDepth, dt);
     Swarm.update(depth, aheadDepth, dt);
+    Nest.update(depth, aheadDepth, PX_PER_M);
     const droneDepthNow = depth + (CONFIG.DRONE_Y / PX_PER_M);
     for (const type of Pickups.collect(Drone.x, droneDepthNow, PX_PER_M)) {
       if (type === 'energy') energy = Math.min(CONFIG.ENERGY.MAX, energy + CONFIG.PICKUP.ENERGY_GAIN);
@@ -283,6 +287,12 @@ const Game = (() => {
       if (shieldTime <= 0) _crash();
       else Swarm.shootAt(Drone.x, droneDepth, PX_PER_M);
     }
+
+    // Гнездо щупалец. Щит спасает, но щупальце, в отличие от особи стаи,
+    // никуда не девается — значит под щитом дрон может в нём застрять.
+    // Поэтому щит здесь только отменяет смерть, а выталкивать приходится
+    // игроку: тварь не расстреливается и не исчезает.
+    if (Nest.hitTest(Drone.x, droneDepth, PX_PER_M, _elapsed) && shieldTime <= 0) _crash();
   }
 
   function _crash() {
@@ -496,6 +506,7 @@ const Game = (() => {
     ctx.lineCap = 'butt';
 
     Pickups.draw(ctx, depth, PX_PER_M, CONFIG.DRONE_Y);
+    Nest.draw(ctx, depth, PX_PER_M, _elapsed);
     Swarm.draw(ctx, depth, PX_PER_M, _elapsed);
 
     // Дрон — пока просто круг

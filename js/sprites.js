@@ -31,6 +31,8 @@ const Sprites = (() => {
     coral_03:  'assets/creatures/coral_03.png',
     coral_04:  'assets/creatures/coral_04.png',
     razor_01:  'assets/creatures/razor_01.png',
+    nest_base:     'assets/creatures/nest_base.webp',
+    nest_tentacle: 'assets/creatures/nest_tentacle.webp',
     wall_rock: 'assets/env/wall_rock.webp',
   };
 
