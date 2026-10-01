@@ -42,7 +42,12 @@ const Nest = (() => {
     const clear = w.hitRight - w.hitLeft;
     const reach = Math.max(0, Math.min(N.TENT_MAX, clear - N.GAP_MIN - N.BASE_OUT));
     return {
-      root: side === 'left' ? w.hitLeft + N.BASE_OUT : w.hitRight - N.BASE_OUT,
+      // Корень сидит ВНУТРИ основания, а не на его кромке. Спрайт щупальца
+      // обрезан сверху прямым срезом, и если начинать ровно от кромки,
+      // этот срез видно: щупальце выглядит приставленным, а не выросшим.
+      // Утопив корень, прячем срез под мякотью основания.
+      root: side === 'left' ? w.hitLeft + N.BASE_OUT * N.ROOT_IN
+                            : w.hitRight - N.BASE_OUT * N.ROOT_IN,
       dir:  side === 'left' ? 1 : -1,
       clear, reach,
     };
@@ -264,13 +269,28 @@ const Nest = (() => {
         }
       }
 
-      // ОСНОВАНИЕ поверх корней щупалец — стыки прячутся под ним
+      // ОСНОВАНИЕ поверх корней щупалец — стыки прячутся под ним.
+      //
+      // Рисуется ПОЛОСАМИ по стене, а не одной картинкой. За свои 200 px
+      // высоты стена успевает уйти вбок на полсотни пикселей, и основание,
+      // посаженное одним прямоугольником, отклеивалось от породы, а корни
+      // щупалец — они-то следуют за стеной — повисали отдельно в воде.
+      // Ровно та же ошибка была у коралла, и ровно то же лекарство.
       if (base) {
-        const w0 = Canyon.getWalls(n.depth + baseM * 0.5);
-        const x = n.side === 'left' ? w0.hitLeft : w0.hitRight - N.BASE_OUT;
-        const img = n.side === 'left' ? base : Sprites.at('nest_base', N.BASE_OUT, N.BASE_PX, true);
-        const src = n.side === 'left' ? Sprites.at('nest_base', N.BASE_OUT, N.BASE_PX, false) : img;
-        if (src) ctx.drawImage(src, x, topPy, N.BASE_OUT, N.BASE_PX);
+        const bimg = Sprites.at('nest_base', N.BASE_OUT, N.BASE_PX, n.side !== 'left');
+        if (bimg) {
+          const STEP = 4;
+          for (let o = 0; o < N.BASE_PX; o += STEP) {
+            const d = n.depth + o / pxPerM;
+            const py = (d - depth) * pxPerM;
+            if (py < -STEP || py > CONFIG.CANVAS_H + STEP) continue;
+            const w = Canyon.getWalls(d);
+            const x = n.side === 'left' ? w.hitLeft : w.hitRight - N.BASE_OUT;
+            const sy = (o / N.BASE_PX) * bimg.height;
+            const sh = Math.max(1, (STEP / N.BASE_PX) * bimg.height);
+            ctx.drawImage(bimg, 0, sy, bimg.width, sh, x, py, N.BASE_OUT, STEP + 1);
+          }
+        }
       }
     }
   }
