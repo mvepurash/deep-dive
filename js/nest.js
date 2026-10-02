@@ -30,6 +30,7 @@ const Nest = (() => {
   let nests = [];          // {depth, side, phase}
   let nextSpawn = 0;
   let armed = false;
+  let _spanM = 0;          // высота основания в метрах, заполняется в update
 
   function reset() { nests = []; nextSpawn = 0; armed = false; }
 
@@ -41,16 +42,9 @@ const Nest = (() => {
     const w = Canyon.getWalls(depth);
     const clear = w.hitRight - w.hitLeft;
     const reach = Math.max(0, Math.min(N.TENT_MAX, clear - N.GAP_MIN - N.BASE_OUT));
-    return {
-      // Корень сидит ВНУТРИ основания, а не на его кромке. Спрайт щупальца
-      // обрезан сверху прямым срезом, и если начинать ровно от кромки,
-      // этот срез видно: щупальце выглядит приставленным, а не выросшим.
-      // Утопив корень, прячем срез под мякотью основания.
-      root: side === 'left' ? w.hitLeft + N.BASE_OUT * N.ROOT_IN
-                            : w.hitRight - N.BASE_OUT * N.ROOT_IN,
-      dir:  side === 'left' ? 1 : -1,
-      clear, reach,
-    };
+    return { wall: side === 'left' ? w.hitLeft : w.hitRight,
+             dir:  side === 'left' ? 1 : -1,
+             clear, reach };
   }
 
   // Доля смыкания 0..1. Косинус, а не ступени: тварь должна течь, а не
@@ -84,12 +78,16 @@ const Nest = (() => {
   // столкновение — см. правило 1 в шапке.
   function _points(n, i, time, pxPerM) {
     const baseM = _baseM(pxPerM);
-    const rootDepth = n.depth + baseM * (i + 0.5) / N.TENT_COUNT;
+    // Корень — в своём отверстии, а не на равных долях высоты. И утоплен
+    // внутрь основания: спрайт щупальца обрезан сверху прямым срезом, и у
+    // кромки этот срез видно — щупальце выглядит приставленным.
+    const sock = N.SOCKETS[i];
+    const rootDepth = n.depth + baseM * sock.t;
     const r = _room(rootDepth, n.side);
     const amt = _amt(n, i, time);
     const wob = Math.sin(time * 1.7 + i * 1.3 + n.phase * 6) * 4;   // дыхание
 
-    const x0 = r.root, y0 = rootDepth;
+    const x0 = r.wall + r.dir * N.BASE_OUT * sock.inx, y0 = rootDepth;
     const P0 = { x: x0, y: y0 };
     // сомкнуто: почти прямое поперёк. раскрыто: вышло и загнулось вниз к стене
     // Сомкнутое щупальце не прямая: лёгкая дуга вверх и провис к кончику.
@@ -131,7 +129,7 @@ const Nest = (() => {
       else           x = Math.max(x, lim + N.GAP_MIN + N.SAFETY + rad);
       pts.push({ x, depth: p.y, r: rad });
     }
-    return { pts, amt, dir: r.dir, root: r.root, rootDepth };
+    return { pts, amt, dir: r.dir, root: x0, rootDepth };
   }
 
   // ---------- появление ----------
@@ -160,6 +158,7 @@ const Nest = (() => {
   }
 
   function update(depth, aheadDepth, pxPerM) {
+    _spanM = _baseM(pxPerM);
     _maybeSpawn(depth, aheadDepth, pxPerM);
     const baseM = _baseM(pxPerM);
     nests = nests.filter(n => n.depth + baseM > depth - 60);
@@ -295,8 +294,19 @@ const Nest = (() => {
     }
   }
 
+  // Занято ли это место стеной гнезда. Нужно наростам: коралл, выросший
+  // прямо на гнезде, — это две твари в одной точке, а правило у нас одно
+  // на всю игру: испытания не складываются.
+  function covers(depth, side) {
+    for (const n of nests) {
+      if (n.side !== side) continue;
+      if (depth > n.depth - 6 && depth < n.depth + _spanM + 6) return true;
+    }
+    return false;
+  }
+
   function count() { return nests.length; }
 
-  return { reset, update, hitTest, clearGapAt, draw, count };
+  return { reset, update, hitTest, clearGapAt, draw, count, covers };
 
 })();
