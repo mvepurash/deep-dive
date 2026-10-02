@@ -232,6 +232,41 @@ const Nest = (() => {
       const topPy = (n.depth - depth) * pxPerM;
       if (topPy > CONFIG.CANVAS_H + 80 || topPy + N.BASE_PX < -80) continue;
 
+
+      // ОСНОВАНИЕ РИСУЕТСЯ ПЕРВЫМ, щупальца — поверх него.
+      //
+      // Сначала было наоборот, и владелец это забраковал: «щупальца идут
+      // не из гнезда, а из-за картинки». Он прав, и причина в том, что
+      // отверстие на спрайте НАРИСОВАНО, а не прозрачно — внутри закрашена
+      // тёмная глубина. Основание поверх щупалец закрывало их корни
+      // целиком (замер: 17% длины каждого), и наружу щупальце выходило
+      // там, где кончается силуэт, а не из дырки.
+      //
+      // Теперь корень лежит в отверстии сверху: щупальце видно от самой
+      // дырки, а её тёмная сердцевина остаётся позади него.
+      //
+      // Рисуется ПОЛОСАМИ по стене, а не одной картинкой. За свои 200 px
+      // высоты стена успевает уйти вбок на полсотни пикселей, и основание,
+      // посаженное одним прямоугольником, отклеивалось от породы, а корни
+      // щупалец — они-то следуют за стеной — повисали отдельно в воде.
+      // Ровно та же ошибка была у коралла, и ровно то же лекарство.
+      if (base) {
+        const bimg = Sprites.at('nest_base', N.BASE_OUT, N.BASE_PX, n.side !== 'left');
+        if (bimg) {
+          const STEP = 4;
+          for (let o = 0; o < N.BASE_PX; o += STEP) {
+            const d = n.depth + o / pxPerM;
+            const py = (d - depth) * pxPerM;
+            if (py < -STEP || py > CONFIG.CANVAS_H + STEP) continue;
+            const w = Canyon.getWalls(d);
+            const x = n.side === 'left' ? w.hitLeft : w.hitRight - N.BASE_OUT;
+            const sy = (o / N.BASE_PX) * bimg.height;
+            const sh = Math.max(1, (STEP / N.BASE_PX) * bimg.height);
+            ctx.drawImage(bimg, 0, sy, bimg.width, sh, x, py, N.BASE_OUT, STEP + 1);
+          }
+        }
+      }
+
       // ЩУПАЛЬЦА. Рисуем полосами вдоль кривой: каждая полоса берётся из
       // прямого спрайта и поворачивается по касательной. Шва между ними
       // нет, потому что полосы идут встык из одной картинки.
@@ -268,29 +303,6 @@ const Nest = (() => {
         }
       }
 
-      // ОСНОВАНИЕ поверх корней щупалец — стыки прячутся под ним.
-      //
-      // Рисуется ПОЛОСАМИ по стене, а не одной картинкой. За свои 200 px
-      // высоты стена успевает уйти вбок на полсотни пикселей, и основание,
-      // посаженное одним прямоугольником, отклеивалось от породы, а корни
-      // щупалец — они-то следуют за стеной — повисали отдельно в воде.
-      // Ровно та же ошибка была у коралла, и ровно то же лекарство.
-      if (base) {
-        const bimg = Sprites.at('nest_base', N.BASE_OUT, N.BASE_PX, n.side !== 'left');
-        if (bimg) {
-          const STEP = 4;
-          for (let o = 0; o < N.BASE_PX; o += STEP) {
-            const d = n.depth + o / pxPerM;
-            const py = (d - depth) * pxPerM;
-            if (py < -STEP || py > CONFIG.CANVAS_H + STEP) continue;
-            const w = Canyon.getWalls(d);
-            const x = n.side === 'left' ? w.hitLeft : w.hitRight - N.BASE_OUT;
-            const sy = (o / N.BASE_PX) * bimg.height;
-            const sh = Math.max(1, (STEP / N.BASE_PX) * bimg.height);
-            ctx.drawImage(bimg, 0, sy, bimg.width, sh, x, py, N.BASE_OUT, STEP + 1);
-          }
-        }
-      }
     }
   }
 
