@@ -48,8 +48,10 @@ const Game = (() => {
       { name: 'wall_rock', h: 1, tint: 1.00 },
       { name: 'wall_rock', h: 1, tint: 0.55 },   // второй слой, ломает повтор
     ]);
+    Screens.load();
     _bindInput();
     start();
+    Screens.set('title');     // игра готова, но ждём на титуле
     lastTime = performance.now();
     requestAnimationFrame(loop);
   }
@@ -144,7 +146,10 @@ const Game = (() => {
     };
     const joyRelease = () => { joy.active = false; joy.dx = 0; joy.dy = 0; joy.rawx = 0; joy.rawy = 0; joy.steerDx = 0; joy.lastFx = null; };
 
+    // Пока показан экран, касания принадлежат ему, а не дрону.
+    // Иначе палец, которым игрок жмёт «НАЧАТЬ», тут же уводит дрон вбок.
     const onStart = (cx, cy) => {
+      if (Screens.get() !== 'game') { Screens.down(cx, cy); return; }
       const m = CONFIG.CONTROL_MODE;
       if (m === 'joystick')      joyMove(cx, cy);
       else if (m === 'strip')    stripTarget(cx);
@@ -152,21 +157,32 @@ const Game = (() => {
       else                       Drone.setTarget(cx);
     };
     const onMove = (cx, cy) => {
+      if (Screens.get() !== 'game') return;
       const m = CONFIG.CONTROL_MODE;
       if (m === 'joystick')      joyMove(cx, cy);
       else if (m === 'strip')    stripTarget(cx);
       else if (m === 'relative') drag(cx);
       else                       Drone.setTarget(cx);
     };
-    const release = () => { anchorX = null; joyRelease(); };
+    const release = (cx, cy) => {
+      if (Screens.get() !== 'game') { _screenAction(Screens.up(cx, cy)); return; }
+      anchorX = null; joyRelease();
+    };
 
     canvas.addEventListener('touchstart', e => { e.preventDefault(); const p = toCanvas(e.touches[0].clientX, e.touches[0].clientY); onStart(p.x, p.y); }, { passive: false });
     canvas.addEventListener('touchmove',  e => { e.preventDefault(); const p = toCanvas(e.touches[0].clientX, e.touches[0].clientY); onMove(p.x, p.y); }, { passive: false });
-    canvas.addEventListener('touchend',   e => { e.preventDefault(); release(); }, { passive: false });
+    canvas.addEventListener('touchend',   e => {
+      e.preventDefault();
+      const t = e.changedTouches && e.changedTouches[0];
+      const p = t ? toCanvas(t.clientX, t.clientY) : { x: -1, y: -1 };
+      release(p.x, p.y);
+    }, { passive: false });
 
     let mouseDown = false;
     window.addEventListener('mousedown', e => { mouseDown = true; const p = toCanvas(e.clientX, e.clientY); onStart(p.x, p.y); });
-    window.addEventListener('mouseup',   () => { mouseDown = false; release(); });
+    window.addEventListener('mouseup', e => {
+      mouseDown = false; const p = toCanvas(e.clientX, e.clientY); release(p.x, p.y);
+    });
     window.addEventListener('mousemove', e => {
       const p = toCanvas(e.clientX, e.clientY);
       if (CONFIG.CONTROL_MODE === 'absolute') onMove(p.x, p.y);
@@ -295,6 +311,16 @@ const Game = (() => {
     if (Nest.hitTest(Drone.x, droneDepth, PX_PER_M, _elapsed) && shieldTime <= 0) _crash();
   }
 
+  // Что делает каждая кнопка. Одно место на всю игру: добавится экран —
+  // добавится строка здесь, и больше нигде.
+  function _screenAction(id) {
+    if (!id) return;
+    if (id === 'start')    { Screens.set('game'); start(); }
+    else if (id === 'howto')    Screens.set('howto');
+    else if (id === 'back')     Screens.set('title');
+    else if (id === 'settings') { /* экран ещё не отрисован */ }
+  }
+
   function _crash() {
     running = false;
     Drone.kill();
@@ -302,7 +328,7 @@ const Game = (() => {
       bestDepth = depth;
       try { localStorage.setItem('dd_best', String(Math.floor(bestDepth))); } catch (e) {}
     }
-    setTimeout(start, 900);
+    setTimeout(() => { start(); Screens.set('title'); }, 900);
   }
 
   // Наросты на стенах.
@@ -676,8 +702,8 @@ const Game = (() => {
   function loop(now) {
     const dt = Math.min((now - lastTime) / 1000, 0.05);
     lastTime = now;
-    update(dt);
-    draw();
+    if (Screens.get() === 'game') { update(dt); draw(); }
+    else Screens.draw(ctx, { best: bestDepth });
     requestAnimationFrame(loop);
   }
 
