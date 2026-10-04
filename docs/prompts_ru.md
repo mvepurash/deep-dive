@@ -286,3 +286,85 @@ TEXT, exact:
 дважды, и любая будущая правка окна тоже будет делаться дважды.
 
 Сдавать полным файлом, не скриншотом.
+
+---
+
+## Настройки — правка уже отрисованного, оба языка
+
+Экран пришёл в некоторых местах лучше моего ТЗ: громкость ползунком
+полезнее немого «вкл/выкл», одна кнопка честнее двух. ТЗ переписал под
+него, а не наоборот.
+
+Ошибка одна, зато ровно та, о которой ТЗ предупреждало отдельным
+разделом: **нарисовано всё, что обязана рисовать программа** — кружки
+ползунков, залитая часть дорожки, «70%», «80%» и «ВКЛ» у вибрации.
+Положение кружка и есть настройка; нарисованный кружок будет
+просвечивать из-под настоящего, и переключатель станет выглядеть
+сломанным.
+
+Вторая правка не про рисунок, а про обещание: строка **УПРАВЛЕНИЕ** с
+выбором «сенсор / геймпад». Геймпада игра не поддерживает. Обещать в
+настройках то, чего нет, нельзя — меняем её на **ЯЗЫК**.
+
+```
+EDIT the existing image, do NOT redraw it.
+
+Keep everything as it is: the ornate blue metal frame, the glow, the
+title plate, the colours, the row plates, the composition. Change only
+what is listed below.
+
+FIX 1 — EMPTY THE CONTROLS. The program draws the live values on top of
+this picture, so the picture must show empty controls:
+- MUSIC row: keep the groove, but EMPTY. No filled part, no round knob,
+  no "70%". Just a dark groove with a thin cyan outline, full width.
+- SOUNDS row: the same. No fill, no knob, no "80%".
+- VIBRATION row: keep the capsule, but EMPTY. No white circle inside it,
+  no "ON" text.
+Leave clear empty space to the right of each groove where the percentage
+will be written.
+
+FIX 2 — REPLACE THE "CONTROL" ROW. Remove the row with the touch and
+gamepad icons entirely. In its place put a row in the same style:
+the word LANGUAGE on the left and an empty field on the right. Nothing
+inside the field.
+
+FIX 3 — SIZES. Canvas 480 x 854, portrait 9:16. Draw larger if you like,
+keep the proportion exactly.
+- window: 392 px wide, centred, 44 px of empty space on each side
+  (the same width as the pause window)
+- the SAVE button: 280 x 75, the same as every other button in the game
+- close cross: 44 x 44, perfectly square
+
+BACKGROUND: fully transparent PNG. No scene, no canyon, no creatures
+behind the window. The game is drawn underneath by the program.
+
+TEXT, exact:
+  title:   SETTINGS
+  rows:    MUSIC      [empty groove]
+           SOUNDS     [empty groove]
+           VIBRATION  [empty capsule]
+           LANGUAGE   [empty field]
+  button:  SAVE   (gold)
+
+DO NOT: draw any knob, dot or handle inside a groove or capsule; draw
+any percentage or ON/OFF text; put anything in the language field; add a
+background scene; change the frame or the title plate.
+```
+
+Для русской версии — тот же промт, заменить только блок текста:
+
+```
+TEXT, exact:
+  title:   НАСТРОЙКИ
+  rows:    МУЗЫКА     [empty groove]
+           ЗВУКИ      [empty groove]
+           ВИБРАЦИЯ   [empty capsule]
+           ЯЗЫК       [empty field]
+  button:  СОХРАНИТЬ   (gold)
+```
+
+**Геометрия обеих версий обязана совпасть пиксель в пиксель**, и ширина
+окна обязана совпасть с паузой и концом погружения. Проще всего взять
+готовый файл подложкой и заменить только надписи.
+
+Сдавать полным файлом, не скриншотом.
