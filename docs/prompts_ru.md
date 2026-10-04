@@ -368,3 +368,88 @@ TEXT, exact:
 готовый файл подложкой и заменить только надписи.
 
 Сдавать полным файлом, не скриншотом.
+
+---
+
+## Конец погружения — сборка с файла паузы
+
+Экран новый, но рисовать его с нуля не надо. Рамка у паузы и настроек
+наконец совпала — это образец семьи, и третье окно обязано быть из неё
+же. Поэтому промт начинается с «возьми файл паузы и замени начинку»:
+так рамка и кнопки сойдутся сами, без линейки.
+
+Пустых зон здесь пять — больше, чем на любом другом экране. Всё, что
+меняется от захода к заходу, рисует программа, и всё нарисованное
+«для примера» останется под настоящим и будет видно.
+
+Единиц «м» и «m» в этом промте нет намеренно. Нарисованная «м» на
+английском экране уже один раз осталась кириллической, и выбивать её
+пришлось вручную. Чего нет на картинке, то не придётся выбивать: число
+и единицу программа пишет вместе.
+
+```
+Use the PAUSE screen file as the base. Keep its window frame, its glow,
+its title plate, its button shape and its button size exactly. Replace
+only the contents.
+
+This is the game over window. Top to bottom:
+
+1. TITLE: CONNECTION LOST
+
+2. CAUSE STRIP: a framed strip with a small warning triangle on the LEFT
+   and EMPTY space to the right of it. The program writes the cause of
+   death into that empty space. Do not write any text there yourself.
+   Make the empty space wide enough to fit OUT OF POWER in full - that
+   is the longest line that will go there.
+
+3. ILLUSTRATION, small: the silhouette of a small submersible drone
+   sinking away into darkness, its lights fading out. Seen from behind
+   and slightly above. No wreckage, no broken hull, no creature, no
+   explosion - just a shape being swallowed by the dark. Keep it small:
+   a frozen frame of the real game shows behind this window, and a large
+   drawn scene would fight with it.
+
+4. RESULTS: two slots side by side, labels drawn, values EMPTY.
+   left slot  - the label DEPTH REACHED, empty space under it
+   right slot - the label CAPSULES, empty space under it
+   Do NOT draw any digits. Do NOT draw any unit letter anywhere - no "m",
+   no "M". The program writes the number and the unit together.
+
+5. PERSONAL BEST: the label on the left, an EMPTY field on the right.
+   Make this field WIDER than the result slots: the program writes
+   "9999 m NEW!" into it when the record is beaten.
+
+6. THREE BUTTONS in a column, all three the SAME size and shape, taken
+   from the pause screen, gap between them equal:
+     CONTINUE FOR AD   (with a small video / play icon, gold)
+     DIVE AGAIN
+     MAIN MENU
+   The icon must sit inside the button rectangle, not stick out.
+
+7. TIP AREA at the bottom: an EMPTY area two text lines tall. Draw
+   nothing in it. The program writes a random tip there.
+
+BACKGROUND: fully transparent PNG, real alpha. Crop tight around the
+window including its glow. No canvas around it, no scene behind it.
+
+DO NOT: write any digits, any unit letter, any cause of death, or any
+tip text; draw a creature or wreckage; make the illustration large; make
+the buttons a different size from the pause screen buttons; put a white
+or coloured background behind the window.
+```
+
+Для русской версии — тот же промт, заменить только текст:
+
+```
+1. TITLE: СВЯЗЬ ПОТЕРЯНА
+2. CAUSE STRIP: empty space wide enough for ЭНЕРГИЯ КОНЧИЛАСЬ
+4. RESULTS: ДОСТИГНУТАЯ ГЛУБИНА  /  СОБРАНО КАПСУЛ
+5. PERSONAL BEST: ЛИЧНЫЙ РЕКОРД, field fits "9999 м  НОВЫЙ!"
+6. BUTTONS: ПРОДОЛЖИТЬ ЗА РЕКЛАМУ / ПОГРУЗИТЬСЯ СНОВА / В ГЛАВНОЕ МЕНЮ
+```
+
+**Вторую версию делать с первой подложкой, меняя только надписи.**
+Геометрия двух языков обязана совпасть пиксель в пиксель — иначе кнопки
+придётся задавать дважды, и каждая будущая правка окна тоже.
+
+Сдавать полным файлом, не скриншотом.
