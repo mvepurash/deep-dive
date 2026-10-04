@@ -33,6 +33,11 @@ const Sprites = (() => {
     razor_01:  'assets/creatures/razor_01.png',
     nest_base:     'assets/creatures/nest_base.webp',
     nest_tentacle: 'assets/creatures/nest_tentacle.webp',
+    eel_head:      'assets/creatures/eel_head.webp',
+    eel_body:      'assets/creatures/eel_body.webp',
+    // Нора уже тонирована кривой стены при сборке, а не в игре: она одна,
+    // и держать ради неё ещё один проход по пикселям в загрузке незачем.
+    eel_burrow:    'assets/creatures/eel_burrow.webp',
     wall_rock: 'assets/env/wall_rock.webp',
   };
 
