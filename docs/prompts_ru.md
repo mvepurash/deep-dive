@@ -200,3 +200,89 @@ edge exactly for seamless vertical tiling.
 уже щупальца. Владелец увидел это сразу, замеры не ловили: «картинка
 разъехалась» — не число. Перед сборкой составной твари надо измерить, где
 на спрайте гнёзда, сочленения и крепления, и подогнать код под них.
+
+---
+
+## Пауза — правка уже отрисованного, оба языка
+
+Экран пришёл почти готовым: фон прозрачный, окно на месте, поле под
+число пустое, «m» латинская. Брак один, но видимый без линейки —
+**золотая кнопка выше и шире трёх синих** (78 против 63 по высоте).
+
+Поэтому промт ниже — НЕ перерисовка. Генератору сказано сохранить рамку,
+свечение, цвета и композицию и тронуть только геометрию кнопок. Просить
+перерисовать целиком тут нельзя: хорошее потеряется вместе с плохим,
+а рамка удалась.
+
+Про числа честно: генератор не умеет попадать в пиксель — он не смог
+даже заменить одну букву с третьей попытки. Размеры в промте стоят как
+ориентир, а не как приёмка. Технически точные значения и не нужны:
+прямоугольники кнопок программа снимает с готовой картинки (см.
+`js/screens.js`). Единый размер нужен для опрятности — игрок переходит
+с экрана на экран и видит одну и ту же кнопку.
+
+Магенты здесь нет намеренно. У тварей фон магентовый, потому что
+генераторы запекают шахматку в цвет. Но у окна светящаяся рамка с
+мягким ореолом, а мягкое свечение из магенты вычитается грязно.
+Прозрачный PNG художник уже отдал — значит, умеет.
+
+```
+EDIT the existing image, do NOT redraw it.
+
+Keep everything as it is: the ornate blue metal frame, the glow, the
+title plate, the colours, the composition, the texture. Change only the
+geometry of the buttons.
+
+THE ONE FIX — ALL FOUR BUTTONS MUST BE THE SAME SIZE AND SHAPE.
+Right now the gold RESUME button is taller and wider than the three blue
+ones. Every button must be the identical rectangle: same width, same
+height, same corner cuts, same border thickness. The gold button differs
+from the blue ones ONLY in colour. Never in size.
+
+SIZES. Canvas 480 x 854, portrait 9:16. Draw larger if you like, keep
+the proportion exactly.
+- window: 392 px wide, centred, 44 px of empty space on each side
+- every button: 280 x 75
+- gap between neighbouring buttons: 24 px, equal everywhere
+- close cross: 44 x 44, perfectly square
+
+BACKGROUND: fully transparent PNG. No scene, no canyon, no creatures
+behind the window. The game is drawn underneath by the program. Only the
+window itself, nothing else.
+
+LEAVE EMPTY: the field to the right of DEPTH. The program writes the
+number into it. Do not draw any digits there.
+
+TEXT, exact:
+  title:   PAUSE
+  row:     DEPTH   [empty field]   m
+  buttons, top to bottom:
+           RESUME   (gold)
+           SETTINGS
+           HOW TO PLAY
+           EXIT TO MENU
+
+DO NOT: make the main button larger than the others; add a background
+scene; put digits in the depth field; add icons or ornaments to the
+buttons; change the frame or the title plate.
+```
+
+Для русской версии — тот же промт, заменить только блок текста:
+
+```
+TEXT, exact:
+  title:   ПАУЗА
+  row:     ГЛУБИНА   [empty field]   м
+  buttons, top to bottom:
+           ПРОДОЛЖИТЬ   (gold)
+           НАСТРОЙКИ
+           КАК ИГРАТЬ
+           ВЫЙТИ В МЕНЮ
+```
+
+**Геометрия обеих версий обязана совпасть пиксель в пиксель.** Проще
+всего взять готовый английский файл подложкой и заменить только надписи.
+Если геометрия разъедется, прямоугольники кнопок придётся задавать
+дважды, и любая будущая правка окна тоже будет делаться дважды.
+
+Сдавать полным файлом, не скриншотом.
