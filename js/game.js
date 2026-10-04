@@ -45,6 +45,11 @@ const Game = (() => {
       { name: 'razor_01', h: CONFIG.SWARM.RADIUS * 2, swim: true },
       { name: 'nest_base', w: CONFIG.NEST.BASE_OUT, h: CONFIG.NEST.BASE_PX },
       { name: 'nest_base', w: CONFIG.NEST.BASE_OUT, h: CONFIG.NEST.BASE_PX, flip: true },
+      { name: 'eel_burrow', w: CONFIG.EEL.BURROW_W, h: CONFIG.EEL.BURROW_H },
+      { name: 'eel_burrow', w: CONFIG.EEL.BURROW_W, h: CONFIG.EEL.BURROW_H, flip: true },
+      { name: 'eel_body',   w: CONFIG.EEL.BODY_W,   h: CONFIG.EEL.BODY_H },
+      { name: 'eel_head',   w: CONFIG.EEL.HEAD_W,   h: CONFIG.EEL.HEAD_H },
+      { name: 'eel_head',   w: CONFIG.EEL.HEAD_W,   h: CONFIG.EEL.HEAD_H, flip: true },
       { name: 'wall_rock', h: 1, tint: 1.00 },
       { name: 'wall_rock', h: 1, tint: 0.55 },   // второй слой, ломает повтор
     ]);
@@ -68,6 +73,7 @@ const Game = (() => {
     shots = []; cleared = [];
     Swarm.reset();
     Nest.reset();
+    Eel.reset();
     _elapsed = 0;
     running = true;
   }
@@ -252,6 +258,9 @@ const Game = (() => {
     Swarm.update(depth, aheadDepth, dt);
     Nest.update(depth, aheadDepth, PX_PER_M);
     const droneDepthNow = depth + (CONFIG.DRONE_Y / PX_PER_M);
+    // Угрю нужны дрон и скорость падения: он бьёт по месту и подгадывает
+    // момент под подход, а не живёт по своему секундомеру
+    Eel.update(depth, aheadDepth, PX_PER_M, dt, Drone.x, droneDepthNow, fallSpeed);
     for (const type of Pickups.collect(Drone.x, droneDepthNow, PX_PER_M)) {
       if (type === 'energy') energy = Math.min(CONFIG.ENERGY.MAX, energy + CONFIG.PICKUP.ENERGY_GAIN);
       // Оружие и щит включаются сразу: при одном пальце кнопок активации нет
@@ -309,6 +318,10 @@ const Game = (() => {
     // Поэтому щит здесь только отменяет смерть, а выталкивать приходится
     // игроку: тварь не расстреливается и не исчезает.
     if (Nest.hitTest(Drone.x, droneDepth, PX_PER_M, _elapsed) && shieldTime <= 0) _crash();
+
+    // Угорь. Щит спасает так же, как от гнезда: тварь не расстреливается
+    // и никуда не девается, выталкиваться игроку придётся самому.
+    if (Eel.hitTest(Drone.x, droneDepth, PX_PER_M, _elapsed) && shieldTime <= 0) _crash();
   }
 
   // Что делает каждая кнопка. Одно место на всю игру: добавится экран —
@@ -533,6 +546,7 @@ const Game = (() => {
 
     Pickups.draw(ctx, depth, PX_PER_M, CONFIG.DRONE_Y);
     Nest.draw(ctx, depth, PX_PER_M, _elapsed);
+    Eel.draw(ctx, depth, PX_PER_M, _elapsed);
     Swarm.draw(ctx, depth, PX_PER_M, _elapsed);
 
     // Дрон — пока просто круг
@@ -721,6 +735,7 @@ const Game = (() => {
   // автопилот не знает, где находится, а вся приёмка в этом проекте
   // держится на прогонах автопилота, а не на впечатлении от кадра.
   return { start, isCleared, get depth() { return depth; },
+                             get elapsed() { return _elapsed; },
                              get droneDepth() { return depth + CONFIG.DRONE_Y / PX_PER_M; } };
 
 })();
