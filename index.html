@@ -5,10 +5,19 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
   <title>Глубокое погружение — прототип ущелья</title>
   <style>
+    /* Выделение и контекстное меню отключены по всей странице.
+       Это не вкусовщина, а пункт приёмки Яндекс Игр: «лонгтап по
+       внутреннему полю игры не приводит к выделению поля или открытию
+       контекстного меню», и то же для десктопа. Палец, задержанный на
+       холсте, иначе поднимает системное меню «сохранить картинку» прямо
+       посреди погружения. */
     html, body {
       margin: 0; padding: 0; height: 100%;
       background: #000; overflow: hidden;
       -webkit-tap-highlight-color: transparent;
+      -webkit-touch-callout: none;
+      -webkit-user-select: none;
+      user-select: none;
       touch-action: none;
       font-family: sans-serif;
     }
@@ -28,6 +37,15 @@
   <div id="wrap">
     <canvas id="game-canvas"></canvas>
   </div>
+
+  <script>
+    // Контекстное меню гасим и обработчиком тоже: одного CSS мало —
+    // правый клик на десктопе он не отменяет.
+    window.addEventListener('contextmenu', e => e.preventDefault());
+    // Жест «растащить пальцами» и двойной тап по холсту не должны
+    // масштабировать страницу: в игре это промах, а не зум.
+    window.addEventListener('gesturestart', e => e.preventDefault());
+  </script>
 
   <script src="js/config.js"></script>
   <script src="js/sprites.js"></script>
