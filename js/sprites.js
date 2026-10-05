@@ -39,6 +39,10 @@ const Sprites = (() => {
     // и держать ради неё ещё один проход по пикселям в загрузке незачем.
     eel_burrow:    'assets/creatures/eel_burrow.webp',
     wall_rock: 'assets/env/wall_rock.webp',
+    // Красная черта поверх значка звука. Сам значок нарисован внутри
+    // заставки, а перечёркивание — отдельной картинкой: держать две
+    // версии титула ради одной черты незачем.
+    sound_slash: 'assets/icons/icon_sound_slash.webp',
   };
 
   const imgs = {};

@@ -141,14 +141,22 @@ const Screens = (() => {
       const b = BTN[state].find(q => q.id === 'sound');
       if (b) {
         const [x, y, w, h] = b.rect;
-        ctx.save();
-        ctx.strokeStyle = 'rgba(255,90,70,0.95)';
-        ctx.lineWidth = 4;
-        ctx.lineCap = 'round';
-        ctx.beginPath();
-        ctx.moveTo(x + 7, y + 7); ctx.lineTo(x + w - 7, y + h - 7);
-        ctx.stroke();
-        ctx.restore();
+        // Черта у нас НАРИСОВАННАЯ, а не проведённая кодом. Своя линия
+        // работала, но рядом с отрисованным значком читалась как заплата:
+        // ровный отрезок без блика и без скруглений. Черту вынул из пары
+        // icon_sound_on / icon_sound_off, которая уже лежала в проекте, —
+        // взял ровно те пиксели, что покраснели.
+        const sl = Sprites.at('sound_slash', w, h, false);
+        if (sl) ctx.drawImage(sl, x, y, w, h);
+        else {                                  // картинка ещё не доехала
+          ctx.save();
+          ctx.strokeStyle = 'rgba(255,90,70,0.95)';
+          ctx.lineWidth = 4; ctx.lineCap = 'round';
+          ctx.beginPath();
+          ctx.moveTo(x + 7, y + 7); ctx.lineTo(x + w - 7, y + h - 7);
+          ctx.stroke();
+          ctx.restore();
+        }
       }
     }
 

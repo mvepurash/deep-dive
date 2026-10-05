@@ -50,6 +50,7 @@ const Game = (() => {
       { name: 'eel_body',   w: CONFIG.EEL.BODY_W,   h: CONFIG.EEL.BODY_H },
       { name: 'eel_head',   w: CONFIG.EEL.HEAD_W,   h: CONFIG.EEL.HEAD_H },
       { name: 'eel_head',   w: CONFIG.EEL.HEAD_W,   h: CONFIG.EEL.HEAD_H, flip: true },
+      { name: 'sound_slash', w: 43, h: 41 },
       { name: 'wall_rock', h: 1, tint: 1.00 },
       { name: 'wall_rock', h: 1, tint: 0.55 },   // второй слой, ломает повтор
     ]);
