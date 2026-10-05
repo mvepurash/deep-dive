@@ -453,3 +453,75 @@ or coloured background behind the window.
 придётся задавать дважды, и каждая будущая правка окна тоже.
 
 Сдавать полным файлом, не скриншотом.
+
+---
+
+## Титул — перерисовать целиком
+
+Единственный экран, который надо рисовать заново, а не править. Нынешний
+титул не годится по содержанию: на нём **черви из «Тайны астероида»** —
+другой игры, другого мира. Это заметит любой, кто играл в обе.
+
+Промт этот я давал в переписке и не записал сюда — и он потерялся.
+Записываю.
+
+Титул — **не окно, а полноэкранная картинка**: фон залит, прозрачность не
+нужна, магента не нужна. Это единственный экран интерфейса, где так.
+
+Про тварей ниже написано подробно и с запретами, потому что генератор по
+слову «глубоководный» уверенно рисует змей и червей — именно так и
+появились чужие твари на нынешнем титуле.
+
+```
+A title screen for a vertical mobile game. Canvas 480 x 854, portrait
+9:16, drawn larger is fine, keep the proportion exactly. Fully opaque,
+no transparency.
+
+THE SCENE: looking down a deep ocean canyon. Two rock walls going down
+into darkness, a narrow gap of lighter water between them. A small
+submersible drone descending into it, seen from behind and above, its
+lights cutting a cone through the dark water. Bioluminescent cyan glow,
+cold blue-green palette, a sense of pressure and of something enormous
+just out of frame.
+
+THE CREATURES, in silhouette and half-lit, small, at the edges - they
+set the mood, they are not the subject:
+- a shoal of small flat blade-shaped fish, like thrown knives
+- spiky hard corals growing out of the canyon walls
+- a cluster of pale translucent tentacles, like a sea anemone, reaching
+  out of one wall
+- a long-jawed eel looking out of a round hole in the rock
+
+DO NOT DRAW, this matters: no serpents, no snakes, no worms, no
+segmented tube creatures, no sandworms, no tentacled space monsters, no
+asteroids, no stars, no spacecraft. This is an ocean, not space. The
+creatures listed above are the only ones in this game.
+
+THE INTERFACE, over the scene:
+- the game title at the top: DEEP DIVE
+- below it, the label BEST DEPTH and an EMPTY field beside it. Draw no
+  digits - the program writes the number there.
+- three buttons in a column, all three the SAME size and shape, gap
+  between them equal:
+    START   (gold, the main one)
+    HOW TO PLAY
+    SETTINGS
+  Same button shape as the pause screen: take it from that file.
+- a small sound on/off icon in a top corner, drawn as a speaker.
+
+DO NOT: draw any digits in the best depth field; make the main button a
+different size from the other two; let the creatures dominate the
+picture; add a background scene behind the buttons that makes the text
+hard to read.
+```
+
+Для русской версии — заменить текст:
+
+```
+  title:  ГЛУБОКОЕ ПОГРУЖЕНИЕ
+  label:  ЛУЧШАЯ ГЛУБИНА  + пустое поле
+  buttons: НАЧАТЬ (gold) / КАК ИГРАТЬ / НАСТРОЙКИ
+```
+
+Сдавать полным файлом, не скриншотом. Старый титул уйдёт в `_src` сразу,
+как придёт новый.
