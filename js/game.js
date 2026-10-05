@@ -331,7 +331,8 @@ const Game = (() => {
     if (id === 'start')    { Screens.set('game'); start(); }
     else if (id === 'howto')    Screens.set('howto');
     else if (id === 'back')     Screens.set('title');
-    else if (id === 'settings') { /* экран ещё не отрисован */ }
+    else if (id === 'sound')    Screens.toggleMute();
+    else if (id === 'settings') { /* экран отрисован, но ещё не вписан */ }
   }
 
   function _crash() {
