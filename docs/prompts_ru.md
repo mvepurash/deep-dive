@@ -638,3 +638,97 @@ hard to read.
 Поэтому на игровом спрайте клешни надо **поджать к корпусу**, а
 светящиеся элементы оставить крупными и немногочисленными. Силуэт важнее
 деталей: детали пусть остаются на титуле, там дрон крупный.
+
+### Промты на три спрайта дрона
+
+**Главное про порядок: три файла нельзя генерировать независимо.** Если
+попросить три картинки по трём описаниям, они не совпадут ни по
+положению, ни по размеру, и свечение ляжет мимо корпуса. Поэтому сначала
+делается ОДИН мастер, а остальные два получаются ПРАВКОЙ того же файла,
+где ничего не двигают. Тот же приём, которым чинились заставки.
+
+И ещё одно, без чего крен поедет: **дрон должен стоять ровно в центре
+квадрата**. Поворачивать на ±10° я буду вокруг центра холста, и если
+аппарат смещён, он на повороте будет описывать дугу вместо крена.
+
+---
+
+**Шаг 1. Мастер — дрон в игровом ракурсе.**
+
+```
+A single underwater drone on a flat magenta background, colour exactly
+#FF00FF. Square canvas, at least 512 x 512, the drone centred with equal
+margins on all four sides.
+
+THE DRONE: use the model sheet - a triangular armoured hull, two side
+engine pods with round glowing cyan nozzles, a glowing cyan core in the
+middle of the hull, two small mechanical claw arms.
+
+THE VIEW, this is the important part: we are BEHIND the drone and
+slightly ABOVE it, looking down at it as it descends nose-first into the
+deep. We see the back and top of the hull. The two engine nozzles face us
+and glow. The nose points away from us and downward, toward the bottom of
+the frame. This is the same view as on the title screen.
+
+THE CLAWS: folded in, tucked close to the hull. Do not let them stick out
+to the sides - in the game this sprite is 36 pixels across and spread
+claws turn into grey noise.
+
+Cold blue-steel hull, cyan bioluminescent glow, deep-sea lighting.
+No background, no water, no bubbles, no light beams, no scene - only the
+drone on flat magenta.
+```
+
+---
+
+**Шаг 2. `drone_body` — тот же файл с ПОГАШЕННЫМ свечением.**
+
+```
+EDIT the previous image. Do not move, resize or redraw the drone - it
+must stay in exactly the same place, pixel for pixel.
+
+Turn the glow OFF. The two engine nozzles, the central core and the cyan
+seams on the hull all become dark, unlit metal and glass - the same
+material, switched off. No cyan light anywhere. Nothing emits, nothing
+shines.
+
+Keep the magenta background exactly as it is.
+```
+
+---
+
+**Шаг 3. `drone_glow` — только светящееся, на чёрном.**
+
+```
+EDIT the master image again. Do not move, resize or redraw anything -
+every glowing part must stay exactly where it was, pixel for pixel.
+
+Delete the hull, the claws and the magenta background. Keep ONLY the
+light: the two glowing engine nozzles, the glowing central core and the
+cyan seams. Put them on a pure black background, #000000.
+
+Everything that was dark metal becomes black. Only the light remains.
+```
+
+---
+
+**Шаг 4. `drone_gun` — оружейный модуль.**
+
+```
+EDIT the master image again. Do not move or redraw the drone.
+
+Add a compact weapon module to the hull: a short twin-barrel emitter
+mounted under the nose, pointing the same way the drone is going -
+away from us and downward. It must read as bolted on, not built in.
+
+Then delete everything except that module: no hull, no claws, no engines,
+no core. Only the weapon, on flat magenta #FF00FF, in the exact position
+it occupied on the drone.
+```
+
+---
+
+Все четыре файла — одного размера и в одном положении. Я соберу из них
+спрайты по 36 px, свечение буду накладывать режимом `lighter` и оживлять
+кодом, а оружие показывать только на те пять секунд, пока работает
+подобранная пушка.
