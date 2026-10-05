@@ -131,6 +131,10 @@ const Pickups = (() => {
     }
   }
 
-  return { reset, update, collect, draw };
+  // list() — только для проверок: автопилоту в тесте надо знать, куда
+  // лететь за капсулой. Игра этим не пользуется.
+  function list() { return items; }
+
+  return { reset, update, collect, draw, list };
 
 })();

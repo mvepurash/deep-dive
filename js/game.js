@@ -51,6 +51,9 @@ const Game = (() => {
       { name: 'eel_head',   w: CONFIG.EEL.HEAD_W,   h: CONFIG.EEL.HEAD_H },
       { name: 'eel_head',   w: CONFIG.EEL.HEAD_W,   h: CONFIG.EEL.HEAD_H, flip: true },
       { name: 'sound_slash', w: 43, h: 41 },
+      { name: 'drone_body', w: 36, h: 32 },
+      { name: 'drone_glow', w: 36, h: 32 },
+      { name: 'drone_gun',  w: 36, h: 32 },
       { name: 'wall_rock', h: 1, tint: 1.00 },
       { name: 'wall_rock', h: 1, tint: 0.55 },   // второй слой, ломает повтор
     ]);
@@ -71,7 +74,7 @@ const Game = (() => {
     energy = CONFIG.ENERGY.MAX;
     regenDelay = 0;
     shieldTime = 0; weaponTime = 0; shotTimer = 0;
-    shots = []; cleared = [];
+    shots = []; cleared = []; wake = []; wakeAcc = 0;
     Swarm.reset();
     Nest.reset();
     Eel.reset();
@@ -252,6 +255,7 @@ const Game = (() => {
     depth += fallSpeed * dt;
 
     Drone.update(dt);
+    _updateWake(dt);
 
     // Предметы всплывают навстречу
     const aheadDepth = depth + CONFIG.CANVAS_H / PX_PER_M;
@@ -551,11 +555,9 @@ const Game = (() => {
     Eel.draw(ctx, depth, PX_PER_M, _elapsed);
     Swarm.draw(ctx, depth, PX_PER_M, _elapsed);
 
-    // Дрон — пока просто круг
-    ctx.fillStyle = Drone.alive ? '#5fd8ff' : '#ff4444';
-    ctx.beginPath();
-    ctx.arc(Drone.x, CONFIG.DRONE_Y, CONFIG.DRONE_RADIUS, 0, Math.PI * 2);
-    ctx.fill();
+    _drawWake();
+    _drawDrone();
+
     // Щит — кольцо вокруг дрона, мигает к концу действия
     if (shieldTime > 0) {
       const fade = shieldTime < 1.5 ? (Math.sin(shieldTime * 18) * 0.5 + 0.5) : 1;
@@ -566,17 +568,129 @@ const Game = (() => {
       ctx.stroke();
     }
 
-    // Лёгкий след показывает инерцию
-    ctx.strokeStyle = 'rgba(95,216,255,0.5)';
-    ctx.lineWidth = 3;
-    ctx.beginPath();
-    ctx.moveTo(Drone.x, CONFIG.DRONE_Y);
-    ctx.lineTo(Drone.x - Drone.vx * 0.06, CONFIG.DRONE_Y + 14);
-    ctx.stroke();
-
     _drawStrip();
     _drawJoy();
     _drawHud();
+  }
+
+
+  // ---------- ДРОН ----------
+  //
+  // Три слоя из одного рисунка: корпус с ПОГАШЕННЫМ свечением, отдельно
+  // свечение и отдельно оружейный модуль. Делить так, а не по ракурсам,
+  // стоило отдельного разговора с художником, и вот ради чего: из двух
+  // картинок получаются все состояния. Ядро пульсирует в покое, сопла
+  // разгораются на ускорении, гаснут на торможении и совсем тухнут при
+  // гибели — ни одного лишнего рисунка.
+  //
+  // Крен — поворотом, а не отдельным спрайтом. На 36 пикселях
+  // нарисованный крен от повёрнутого не отличить, а это два лишних
+  // рисунка, которые надо держать в согласии.
+  //
+  // Самое широкое место корпуса — блоки двигателей, и в игровом размере
+  // их полуширина равна ровно 18, то есть радиусу столкновения. Поэтому
+  // спрайт кладётся так, чтобы ЭТА строка пришлась на центр дрона:
+  // стена убивает ровно тогда, когда её касается двигатель.
+  const DW = 36, DH = 32, DANCHOR = 18;   // ширина, высота, строка центра
+
+  function _leanOf() {
+    return Math.max(-1, Math.min(1, Drone.vx / CONFIG.DRONE_MAX_SPEED));
+  }
+
+  function _drawDrone() {
+    const body = Sprites.at('drone_body', DW, DH, false);
+    const glow = Sprites.at('drone_glow', DW, DH, false);
+    const gun  = Sprites.at('drone_gun',  DW, DH, false);
+
+    ctx.save();
+    ctx.translate(Drone.x, CONFIG.DRONE_Y);
+    ctx.rotate(_leanOf() * 10 * Math.PI / 180);
+
+    if (!body) {                       // откат: кружок, пока картинки едут
+      ctx.fillStyle = Drone.alive ? '#5fd8ff' : '#ff4444';
+      ctx.beginPath(); ctx.arc(0, 0, CONFIG.DRONE_RADIUS, 0, Math.PI * 2); ctx.fill();
+      ctx.restore();
+      return;
+    }
+
+    ctx.drawImage(body, -DW / 2, -DANCHOR, DW, DH);
+    if (weaponTime > 0 && gun) ctx.drawImage(gun, -DW / 2, -DANCHOR, DW, DH);
+
+    if (glow) {
+      let k = 0.85 + 0.12 * Math.sin(_elapsed * 4.5);     // дыхание в покое
+      if (speedMod > 0) k += 0.55 * speedMod;             // разгон
+      if (speedMod < 0) k *= 1 + 0.55 * speedMod;         // тормоз гасит
+      if (!Drone.alive) k = 0;                            // погас
+      ctx.save();
+      ctx.globalCompositeOperation = 'lighter';
+      ctx.globalAlpha = Math.min(1, k);
+      ctx.drawImage(glow, -DW / 2, -DANCHOR, DW, DH);
+      if (k > 1) {                                        // ярче единицы — вторым проходом
+        ctx.globalAlpha = Math.min(1, k - 1);
+        ctx.drawImage(glow, -DW / 2, -DANCHOR, DW, DH);
+      }
+      ctx.restore();
+    }
+
+    if (!Drone.alive) {                 // гибель: корпус заливает красным
+      ctx.save();
+      ctx.globalCompositeOperation = 'lighter';
+      ctx.globalAlpha = 0.55;
+      ctx.fillStyle = '#ff3a2a';
+      ctx.beginPath(); ctx.arc(0, 0, CONFIG.DRONE_RADIUS, 0, Math.PI * 2); ctx.fill();
+      ctx.restore();
+    }
+    ctx.restore();
+  }
+
+  // ---------- СЛЕД ОТ ДВИГАТЕЛЕЙ ----------
+  //
+  // Это и есть та турбулентность, ради которой не понадобилось ни одного
+  // рисунка. Дрон падает, потревоженная вода остаётся за ним и уходит
+  // вверх; на торможении двигатели бьют вперёд, и струя разворачивается
+  // вниз. На повороте след отклоняется в сторону, ОБРАТНУЮ движению, —
+  // именно по нему глаз и читает манёвр: на 36 пикселях корпус для этого
+  // слишком мал.
+  //
+  // Сопла взяты не на глаз: их центры сняты со спрайта свечения, они
+  // приходятся на +-14 px от оси и на 5 px ниже центра.
+  const NOZZLE_X = 14, NOZZLE_Y = 5;
+  let wake = [], wakeAcc = 0;
+
+  function _updateWake(dt) {
+    if (!running) return;
+    const lean = _leanOf(), push = speedMod;
+    const rate = 24 + 46 * Math.max(0, push);
+    wakeAcc += rate * dt;
+    while (wakeAcc >= 1) {
+      wakeAcc -= 1;
+      const side = Math.random() < 0.5 ? -1 : 1;
+      const back = push < -0.05;                 // тормозим — струя вперёд
+      wake.push({
+        x: Drone.x + side * NOZZLE_X + (Math.random() - 0.5) * 3,
+        y: CONFIG.DRONE_Y + NOZZLE_Y,
+        vx: -lean * 80 + (Math.random() - 0.5) * 45,
+        vy: back ? 130 + Math.random() * 90
+                 : -(110 + 190 * Math.max(0, push) + Math.random() * 70),
+        r: 1.1 + Math.random() * 1.9,
+        t: 0, life: 0.30 + Math.random() * 0.35,
+      });
+    }
+    for (const p of wake) { p.t += dt; p.x += p.vx * dt; p.y += p.vy * dt; }
+    wake = wake.filter(p => p.t < p.life);
+    if (wake.length > 170) wake.splice(0, wake.length - 170);
+  }
+
+  function _drawWake() {
+    if (!wake.length) return;
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    for (const p of wake) {
+      const u = 1 - p.t / p.life;
+      ctx.fillStyle = `rgba(120,215,255,${0.30 * u})`;
+      ctx.beginPath(); ctx.arc(p.x, p.y, p.r * (0.6 + u * 0.8), 0, Math.PI * 2); ctx.fill();
+    }
+    ctx.restore();
   }
 
   // Отладочные строки ставим НАД полосой управления, иначе она их накрывает
@@ -738,6 +852,7 @@ const Game = (() => {
   // держится на прогонах автопилота, а не на впечатлении от кадра.
   return { start, isCleared, get depth() { return depth; },
                              get elapsed() { return _elapsed; },
+                             get weaponTime() { return weaponTime; },
                              get droneDepth() { return depth + CONFIG.DRONE_Y / PX_PER_M; } };
 
 })();

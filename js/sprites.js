@@ -43,6 +43,12 @@ const Sprites = (() => {
     // заставки, а перечёркивание — отдельной картинкой: держать две
     // версии титула ради одной черты незачем.
     sound_slash: 'assets/icons/icon_sound_slash.webp',
+    // Дрон тремя слоями: корпус с погашенным свечением, само свечение и
+    // оружейный модуль. Все три нарезаны одним прямоугольником, поэтому
+    // кладутся друг на друга без подгонки.
+    drone_body: 'assets/sprites/drone_body.webp',
+    drone_glow: 'assets/sprites/drone_glow.webp',
+    drone_gun:  'assets/sprites/drone_gun.webp',
   };
 
   const imgs = {};
