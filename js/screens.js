@@ -45,7 +45,7 @@ const Screens = (() => {
   // Куда программа пишет свои значения. Рисовать там в макете нельзя —
   // наложится.
   const SLOT = {
-    title: { best: [233, 232, 154, 44] },              // ЛУЧШАЯ ГЛУБИНА
+    title: { best: [228, 241, 149, 32] },              // ЛУЧШАЯ ГЛУБИНА
   };
 
   // Старый титул был с червями из «Тайны астероида», и прямоугольники
@@ -106,6 +106,34 @@ const Screens = (() => {
 
   function cancel() { pressed = null; }
 
+
+  // Текст по центру прямоугольника — ПО ЧЕРНИЛАМ, а не по строке.
+  //
+  // Прежде стояло textBaseline = 'middle', и владелец сразу увидел, что
+  // число задрано к верхнему краю поля и сдвинуто вбок. Он прав, и
+  // причина не в опечатке в координатах: 'middle' центрует по кегельной
+  // площадке шрифта, а она выше видимых цифр — у неё сверху запас под
+  // выносные элементы, которых в «3271 м» нет вовсе. По горизонтали то же
+  // самое: 'center' делит ШИРИНУ СТРОКИ, включая боковые отступы кегля.
+  //
+  // Поэтому центруем по настоящим границам отрисованных пикселей, которые
+  // браузер сообщает в actualBoundingBox*. Старый путь оставлен на случай,
+  // если метрик нет, — но тогда и перекос вернётся, так что он только
+  // чтобы не упасть.
+  function _inkCenter(ctx, txt, rect) {
+    const [x, y, w, h] = rect;
+    const m = ctx.measureText(txt);
+    const L = m.actualBoundingBoxLeft, R = m.actualBoundingBoxRight;
+    const A = m.actualBoundingBoxAscent, D = m.actualBoundingBoxDescent;
+    if (L === undefined || A === undefined) {
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText(txt, x + w / 2, y + h / 2);
+      return;
+    }
+    ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
+    ctx.fillText(txt, x + w / 2 - (R - L) / 2, y + h / 2 + (A - D) / 2);
+  }
+
   function draw(ctx, data) {
     const im = imgs[state];
     if (!im) {                      // картинка ещё едет — не чёрный экран
@@ -123,14 +151,10 @@ const Screens = (() => {
     // Значения, которые пишет программа. В макете под ними пусто.
     const s = SLOT[state];
     if (s && s.best && data && data.best !== undefined) {
-      const [x, y, w, h] = s.best;
       ctx.save();
       ctx.fillStyle = '#eaf6ff';
       ctx.font = 'bold 20px monospace';
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.fillText(data.best > 0 ? Math.floor(data.best) + ' м' : 'ПЕРВОЕ',
-                   x + w / 2, y + h / 2);
+      _inkCenter(ctx, data.best > 0 ? Math.floor(data.best) + ' м' : 'ПЕРВОЕ', s.best);
       ctx.restore();
     }
 
