@@ -54,8 +54,21 @@ const Nest = (() => {
     const t = time / N.CYCLE + n.phase + i * N.TENT_PHASE;
     const u = t - Math.floor(t);
     const C = N.CLOSE_FRAC;
-    return u < C ? 0.5 - 0.5 * Math.cos(Math.PI * u / C)
-                 : 0.5 + 0.5 * Math.cos(Math.PI * (u - C) / (1 - C));
+    const a = u < C ? 0.5 - 0.5 * Math.cos(Math.PI * u / C)
+                    : 0.5 + 0.5 * Math.cos(Math.PI * (u - C) / (1 - C));
+
+    // ПОДСТРЕЛЕННОЕ ЩУПАЛЬЦЕ ОТДЁРГИВАЕТСЯ.
+    //
+    // Не отрывается: у щупальца картинка и хитбокс построены из одной
+    // кривой, и отлетевший кусок был бы отдельным телом со своим
+    // хитбоксом — то есть новой тварью, а не обломком. Вместо этого оно
+    // уходит к стене и отлёживается, а потом возвращается в свой цикл.
+    //
+    // Гнездо спрашивает «когда», и выстрел даёт ровно то, чего игроку не
+    // хватало: окно. Убрать тварь он не может, и это нарочно.
+    const h = n.hurt ? n.hurt[i] : 0;
+    if (h > 0) return a * (1 - Math.min(1, h / N.HURT_BACK));
+    return a;
   }
 
   // Кривая щупальца: три точки Безье. Раскрытое загнуто крюком к стене,
@@ -152,13 +165,17 @@ const Nest = (() => {
       if (placed === null) { nextSpawn += N.SEARCH_AHEAD; continue; }
       nests.push({ depth: placed,
                    side: Math.random() < 0.5 ? 'left' : 'right',
-                   phase: Math.random() });
+                   phase: Math.random(),
+                   hurt: [0, 0, 0, 0, 0] });   // сколько ещё отлёживается каждое
       nextSpawn = placed + N.SPAWN_EVERY;
     }
   }
 
-  function update(depth, aheadDepth, pxPerM) {
+  function update(depth, aheadDepth, pxPerM, dt) {
     _spanM = _baseM(pxPerM);
+    for (const n of nests)
+      if (n.hurt) for (let i = 0; i < n.hurt.length; i++)
+        if (n.hurt[i] > 0) n.hurt[i] = Math.max(0, n.hurt[i] - (dt || 0));
     _maybeSpawn(depth, aheadDepth, pxPerM);
     const baseM = _baseM(pxPerM);
     nests = nests.filter(n => n.depth + baseM > depth - 60);
@@ -196,6 +213,30 @@ const Nest = (() => {
       }
     }
     return false;
+  }
+
+
+  // Выстрел по щупальцу. Возвращает точку попадания — она нужна игре для
+  // вспышки, без неё непонятно, засчиталось ли.
+  function shootAt(sx, sDepth, pxPerM, time) {
+    const sy = sDepth * pxPerM, sr = CONFIG.PICKUP.SHOT_RADIUS;
+    const baseM = _baseM(pxPerM);
+    for (const n of nests) {
+      if (sDepth < n.depth - 3 || sDepth > n.depth + baseM + 4) continue;
+      for (let i = 0; i < N.TENT_COUNT; i++) {
+        if (n.hurt && n.hurt[i] > 0) continue;        // уже отлёживается
+        const t = _points(n, i, time, pxPerM);
+        for (let k = 0; k < t.pts.length - 1; k++) {
+          const a = t.pts[k], b = t.pts[k + 1];
+          const d = _segDist(sx, sy, a.x, a.depth * pxPerM, b.x, b.depth * pxPerM);
+          if (d < sr + (a.r + b.r) * 0.5) {
+            if (n.hurt) n.hurt[i] = N.HURT_TIME;
+            return { x: sx, y: sy / pxPerM };          // глубина обратно в метры
+          }
+        }
+      }
+    }
+    return null;
   }
 
   // Чистый просвет на этой глубине с учётом гнезда, в пикселях.
@@ -318,7 +359,10 @@ const Nest = (() => {
   }
 
   function count() { return nests.length; }
+  // list() — только для проверок: тесту надо знать, где именно стоит
+  // гнездо, чтобы прицелиться. Игра этим не пользуется.
+  function list() { return nests; }
 
-  return { reset, update, hitTest, clearGapAt, draw, count, covers };
+  return { reset, update, hitTest, shootAt, clearGapAt, draw, count, covers, list };
 
 })();

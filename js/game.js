@@ -78,7 +78,7 @@ const Game = (() => {
     energy = CONFIG.ENERGY.MAX;
     regenDelay = 0;
     shieldTime = 0; weaponTime = 0; shotTimer = 0;
-    shots = []; cleared = []; wake = []; wakeAcc = 0;
+    shots = []; cleared = []; wake = []; wakeAcc = 0; sparks = [];
     capsules = 0; cause = ''; freshBest = false;
     Swarm.reset();
     Nest.reset();
@@ -261,12 +261,13 @@ const Game = (() => {
 
     Drone.update(dt);
     _updateWake(dt);
+    _updateSparks(dt);
 
     // Предметы всплывают навстречу
     const aheadDepth = depth + CONFIG.CANVAS_H / PX_PER_M;
     Pickups.update(depth, aheadDepth, dt);
     Swarm.update(depth, aheadDepth, dt);
-    Nest.update(depth, aheadDepth, PX_PER_M);
+    Nest.update(depth, aheadDepth, PX_PER_M, dt);
     const droneDepthNow = depth + (CONFIG.DRONE_Y / PX_PER_M);
     // Угрю нужны дрон и скорость падения: он бьёт по месту и подгадывает
     // момент под подход, а не живёт по своему секундомеру
@@ -297,10 +298,22 @@ const Game = (() => {
       sh.depth += shotStep;
       // Снаряд сбивает одну особь и гаснет. Разогнать этим стаю нельзя —
       // девять выстрелов в секунду против полутора десятков особей
-      if (Swarm.shootAt(sh.x, sh.depth, PX_PER_M)) { sh.dead = true; continue; }
+      if (Swarm.shootAt(sh.x, sh.depth, PX_PER_M)) {
+        _spark(sh.x, sh.depth, '#ffd0a0'); sh.dead = true; continue;
+      }
+      // Гнездо и угорь ДОЛЖНЫ замечать пули. До этой правки снаряд
+      // пролетал сквозь них насквозь, и игрок с пушкой решал, что она
+      // сломана. Оружие их не убивает — оно покупает время.
+      const hn = Nest.shootAt(sh.x, sh.depth, PX_PER_M, _elapsed);
+      if (hn) { _spark(hn.x, hn.y, '#cfe8ff'); sh.dead = true; continue; }
+      const he = Eel.shootAt(sh.x, sh.depth, PX_PER_M, _elapsed);
+      if (he) {
+        _spark(he.x, he.y, he.kind === 'eye' ? '#ff6a4a' : '#cfe8ff');
+        sh.dead = true; continue;
+      }
       const w = Canyon.getWalls(sh.depth);
-      if (sh.x <= w.hitLeft)  { cleared.push({ depth: sh.depth, side: 'left'  }); sh.dead = true; }
-      if (sh.x >= w.hitRight) { cleared.push({ depth: sh.depth, side: 'right' }); sh.dead = true; }
+      if (sh.x <= w.hitLeft)  { cleared.push({ depth: sh.depth, side: 'left'  }); _spark(sh.x, sh.depth, '#ffb070'); sh.dead = true; }
+      if (sh.x >= w.hitRight) { cleared.push({ depth: sh.depth, side: 'right' }); _spark(sh.x, sh.depth, '#ffb070'); sh.dead = true; }
     }
     shots = shots.filter(sh => !sh.dead && sh.depth < depth + CONFIG.CANVAS_H / PX_PER_M + 50);
     // Расчищенные участки живут недолго — только пока видны
@@ -573,6 +586,7 @@ const Game = (() => {
     Eel.draw(ctx, depth, PX_PER_M, _elapsed);
     Swarm.draw(ctx, depth, PX_PER_M, _elapsed);
 
+    _drawSparks();
     _drawWake();
     _drawDrone();
 
@@ -592,6 +606,39 @@ const Game = (() => {
     if (withHud !== false) { _drawStrip(); _drawJoy(); _drawHud(); }
   }
 
+
+
+  // ---------- ВСПЫШКИ ПОПАДАНИЙ ----------
+  //
+  // Без них непонятно, засчитался выстрел или нет. Вспышка живёт у своей
+  // ГЛУБИНЫ, а не у экранной точки: пока она горит, дрон успевает уйти на
+  // полсотни пикселей, и привязанная к экрану искра поехала бы вместе с
+  // ним, как наклейка на стекле.
+  let sparks = [];
+  function _spark(x, atDepth, color) {
+    sparks.push({ x, depth: atDepth, c: color || '#cfe8ff', t: 0, life: 0.28 });
+    if (sparks.length > 40) sparks.shift();
+  }
+  function _updateSparks(dt) {
+    for (const s of sparks) s.t += dt;
+    sparks = sparks.filter(s => s.t < s.life);
+  }
+  function _drawSparks() {
+    if (!sparks.length) return;
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    for (const s of sparks) {
+      const u = 1 - s.t / s.life;
+      const py = (s.depth - depth) * PX_PER_M;
+      if (py < -30 || py > CONFIG.CANVAS_H + 30) continue;
+      ctx.globalAlpha = u;
+      ctx.fillStyle = s.c;
+      ctx.beginPath(); ctx.arc(s.x, py, 2 + 11 * (1 - u), 0, Math.PI * 2); ctx.fill();
+      ctx.globalAlpha = u * 0.8;
+      ctx.beginPath(); ctx.arc(s.x, py, 1.5 + 3 * u, 0, Math.PI * 2); ctx.fill();
+    }
+    ctx.restore();
+  }
 
   // ---------- ДРОН ----------
   //

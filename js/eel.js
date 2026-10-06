@@ -318,6 +318,47 @@ const Eel = (() => {
     return false;
   }
 
+
+  // ---------- выстрел ----------
+  //
+  // У угря ДВА разных попадания, и в этом вся соль.
+  //
+  // В голову во время броска — досрочный возврат. Награда за реакцию.
+  //
+  // В светящийся глаз ДО броска — удар отменяется совсем. Глаз загорается
+  // заранее именно для того, чтобы его заметили, и игрок, успевший
+  // выстрелить в предупреждение, заслуживает пройти без удара. Это
+  // единственная механика в игре, которая награждает за внимание к
+  // предупреждению, а не к самой твари.
+  //
+  // Попадание в тело гасит снаряд и даёт вспышку, но ничего не меняет:
+  // «расстрелять можно не всех» написано прямо в «Как играть».
+  function shootAt(sx, sDepth, pxPerM, time) {
+    const sy = sDepth * pxPerM, sr = CONFIG.PICKUP.SHOT_RADIUS;
+    for (const e of eels) {
+      const m = _mouth(e, pxPerM);
+
+      // глаз — пока тварь ещё в норе и целится
+      if (e.state === 'tele' && Math.hypot(sx - m.x, sy - m.py) < E.EYE_R + sr) {
+        e.state = 'ambush'; e.t = 0; e.len = 0; e.slack = 0; e.cool = E.COOL;
+        return { x: m.x, y: m.depth, kind: 'eye' };
+      }
+
+      if (e.len <= 0.5) continue;
+      const sh = _shape(e, pxPerM, time);
+      if (!sh) continue;
+      for (let k = 0; k < sh.pts.length - 1; k++) {
+        const a = sh.pts[k], b = sh.pts[k + 1];
+        if (_segDist(sx, sy, a.x, a.y, b.x, b.y) >= sr + (a.r + b.r) * 0.5) continue;
+        // голова — это последние HEAD_LEN длины дуги
+        const head = sh.arcs[k] >= sh.headStart - 4;
+        if (head && e.state !== 'back') { e.state = 'back'; e.t = 0; }
+        return { x: sx, y: sDepth, kind: head ? 'head' : 'body' };
+      }
+    }
+    return null;
+  }
+
   // Чистый просвет на этой глубине с учётом угря, в пикселях.
   // Ради него всё и затевалось: обещание «не уже GAP_MIN» проверяется
   // числом на всей трассе, а не на глаз в паре кадров.
@@ -492,7 +533,7 @@ const Eel = (() => {
     return out;
   }
 
-  return { reset, update, hitTest, clearGapAt, draw, count, covers, maxReach,
-           list, debugShape };
+  return { reset, update, hitTest, shootAt, clearGapAt, draw, count, covers,
+           maxReach, list, debugShape };
 
 })();
