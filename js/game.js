@@ -22,6 +22,10 @@ const Game = (() => {
   let shots = [];          // {x, depth}
   let _elapsed = 0;        // секунды с начала захода, для анимации стаи
   let cleared = [];        // расстрелянные наросты: {depth, side}
+  let capsules = 0;        // собрано капсул за заход — показываем в конце
+  let cause = '';          // чем всё кончилось, для окна «связь потеряна»
+  let freshBest = false;   // рекорд побит именно в этом заходе
+  let tip = '';            // совет на окне: выбирается один раз на показ
 
   // Сколько метров укладывается в высоту экрана — задаёт масштаб обзора
   const M_PER_SCREEN = 340;
@@ -75,6 +79,7 @@ const Game = (() => {
     regenDelay = 0;
     shieldTime = 0; weaponTime = 0; shotTimer = 0;
     shots = []; cleared = []; wake = []; wakeAcc = 0;
+    capsules = 0; cause = ''; freshBest = false;
     Swarm.reset();
     Nest.reset();
     Eel.reset();
@@ -267,6 +272,7 @@ const Game = (() => {
     // момент под подход, а не живёт по своему секундомеру
     Eel.update(depth, aheadDepth, PX_PER_M, dt, Drone.x, droneDepthNow, fallSpeed);
     for (const type of Pickups.collect(Drone.x, droneDepthNow, PX_PER_M)) {
+      capsules++;
       if (type === 'energy') energy = Math.min(CONFIG.ENERGY.MAX, energy + CONFIG.PICKUP.ENERGY_GAIN);
       // Оружие и щит включаются сразу: при одном пальце кнопок активации нет
       if (type === 'shield') shieldTime = CONFIG.PICKUP.SHIELD_TIME;
@@ -305,7 +311,7 @@ const Game = (() => {
     const w = Canyon.getWalls(droneDepth);
     const r = CONFIG.DRONE_RADIUS;
     if (Drone.x - r < w.hitLeft || Drone.x + r > w.hitRight) {
-      if (shieldTime <= 0) _crash();
+      if (shieldTime <= 0) _crash('РАЗДАВЛЕН');
       // Со щитом дрон выживает, но сквозь породу не проходит: упираемся
       // в стену, иначе щит превращался в режим полёта через камень
       else Drone.clampInside(w.hitLeft + r, w.hitRight - r);
@@ -314,7 +320,7 @@ const Game = (() => {
     // Столкновение со стаей. Щит спасает, как и от стены, но особь при
     // этом гибнет — иначе дрон со щитом застревал бы в косяке
     if (Swarm.hitTest(Drone.x, droneDepth, PX_PER_M)) {
-      if (shieldTime <= 0) _crash();
+      if (shieldTime <= 0) _crash('СЪЕДЕН');
       else Swarm.shootAt(Drone.x, droneDepth, PX_PER_M);
     }
 
@@ -322,11 +328,11 @@ const Game = (() => {
     // никуда не девается — значит под щитом дрон может в нём застрять.
     // Поэтому щит здесь только отменяет смерть, а выталкивать приходится
     // игроку: тварь не расстреливается и не исчезает.
-    if (Nest.hitTest(Drone.x, droneDepth, PX_PER_M, _elapsed) && shieldTime <= 0) _crash();
+    if (Nest.hitTest(Drone.x, droneDepth, PX_PER_M, _elapsed) && shieldTime <= 0) _crash('СЪЕДЕН');
 
     // Угорь. Щит спасает так же, как от гнезда: тварь не расстреливается
     // и никуда не девается, выталкиваться игроку придётся самому.
-    if (Eel.hitTest(Drone.x, droneDepth, PX_PER_M, _elapsed) && shieldTime <= 0) _crash();
+    if (Eel.hitTest(Drone.x, droneDepth, PX_PER_M, _elapsed) && shieldTime <= 0) _crash('СЪЕДЕН');
   }
 
   // Что делает каждая кнопка. Одно место на всю игру: добавится экран —
@@ -334,20 +340,32 @@ const Game = (() => {
   function _screenAction(id) {
     if (!id) return;
     if (id === 'start')    { Screens.set('game'); start(); }
+    else if (id === 'again')    { Screens.set('game'); start(); }
+    else if (id === 'menu')       Screens.set('title');
+    else if (id === 'ad')       { /* реклама ещё не подключена */ }
     else if (id === 'howto')    Screens.set('howto');
     else if (id === 'back')     Screens.set('title');
     else if (id === 'sound')    Screens.toggleMute();
     else if (id === 'settings') { /* экран отрисован, но ещё не вписан */ }
   }
 
-  function _crash() {
+  // Гибель. Кадр ЗАМИРАЕТ и остаётся на экране под окном — игрок видит,
+  // на чём именно всё кончилось. Раньше игра просто перезапускалась через
+  // 0.9 секунды, и момент гибели исчезал вместе с заходом.
+  function _crash(why) {
+    if (!running) return;
     running = false;
+    cause = why || '';
     Drone.kill();
-    if (depth > bestDepth) {
+    freshBest = depth > bestDepth;
+    if (freshBest) {
       bestDepth = depth;
       try { localStorage.setItem('dd_best', String(Math.floor(bestDepth))); } catch (e) {}
     }
-    setTimeout(() => { start(); Screens.set('title'); }, 900);
+    // Совет выбирается ОДИН раз на показ окна. Если тянуть случайный на
+    // каждом кадре, он будет мигать шестьдесят раз в секунду.
+    tip = Screens.TIPS[Math.floor(Math.random() * Screens.TIPS.length)];
+    setTimeout(() => { if (!running) Screens.set('gameover'); }, 700);
   }
 
   // Наросты на стенах.
@@ -511,7 +529,7 @@ const Game = (() => {
     }
   }
 
-  function draw() {
+  function draw(withHud) {
     // Фон — тем темнее, чем глубже
     const dark = Math.min(0.75, depth / 4000);
     ctx.fillStyle = `rgb(${Math.round(12 * (1 - dark))},${Math.round(30 * (1 - dark))},${Math.round(48 * (1 - dark))})`;
@@ -568,9 +586,10 @@ const Game = (() => {
       ctx.stroke();
     }
 
-    _drawStrip();
-    _drawJoy();
-    _drawHud();
+    // На замороженном кадре под окном гибели HUD не нужен: глубина и
+    // рекорд уже написаны в самом окне, а полоса энергии и джойстик
+    // только спорят с ним за внимание.
+    if (withHud !== false) { _drawStrip(); _drawJoy(); _drawHud(); }
   }
 
 
@@ -829,11 +848,23 @@ const Game = (() => {
     ctx.fillText('падение ' + Math.round(fallSpeed) + ' м/с' + modTxt + '   [C] ' + CONFIG.CONTROL_MODE, 10, _dbgY(3));
   }
 
+  // Что знает экран о заходе. Собрано в одном месте: экранов будет
+  // четыре, и каждому нужен свой кусок этих же чисел.
+  function _screenData() {
+    return { best: bestDepth, depth, caps: capsules, cause, tip, fresh: freshBest };
+  }
+
   function loop(now) {
     const dt = Math.min((now - lastTime) / 1000, 0.05);
     lastTime = now;
-    if (Screens.get() === 'game') { update(dt); draw(); }
-    else Screens.draw(ctx, { best: bestDepth });
+    const st = Screens.get();
+    if (st === 'game') { update(dt); draw(); }
+    else {
+      // Под окном конца погружения оставляем ЗАМОРОЖЕННЫЙ кадр: update не
+      // зовём, draw зовём. Игрок видит ту самую стену или ту самую пасть.
+      if (st === 'gameover') draw(false);
+      Screens.draw(ctx, _screenData());
+    }
     requestAnimationFrame(loop);
   }
 
