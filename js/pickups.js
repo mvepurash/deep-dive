@@ -14,10 +14,13 @@ const Pickups = (() => {
 
   const P = CONFIG.PICKUP;
 
+  // Буква на капсуле — не код, а подсказка: первая буква того же слова на
+  // языке игрока. Поэтому она берётся из словаря в момент отрисовки, а не
+  // записана здесь намертво.
   const TYPES = {
-    energy: { color: '#ffd36e', glow: 'rgba(255,211,110,0.9)', label: 'E' },
-    shield: { color: '#7fd4ff', glow: 'rgba(127,212,255,0.9)', label: 'S' },
-    weapon: { color: '#ff8a6e', glow: 'rgba(255,138,110,0.9)', label: 'W' },
+    energy: { color: '#ffd36e', glow: 'rgba(255,211,110,0.9)', key: 'cap_energy' },
+    shield: { color: '#7fd4ff', glow: 'rgba(127,212,255,0.9)', key: 'cap_shield' },
+    weapon: { color: '#ff8a6e', glow: 'rgba(255,138,110,0.9)', key: 'cap_weapon' },
   };
 
   // Случайный тип по весам
@@ -126,7 +129,7 @@ const Pickups = (() => {
       ctx.font = 'bold 14px sans-serif';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
-      ctx.fillText(t.label, it.x, py + 1);
+      ctx.fillText(Lang.t(t.key), it.x, py + 1);
       ctx.restore();
     }
   }

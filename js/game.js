@@ -333,7 +333,7 @@ const Game = (() => {
     const w = Canyon.getWalls(droneDepth);
     const r = CONFIG.DRONE_RADIUS;
     if (Drone.x - r < w.hitLeft || Drone.x + r > w.hitRight) {
-      if (shieldTime <= 0) _crash('РАЗДАВЛЕН');
+      if (shieldTime <= 0) _crash('crushed');
       // Со щитом дрон выживает, но сквозь породу не проходит: упираемся
       // в стену, иначе щит превращался в режим полёта через камень
       else Drone.clampInside(w.hitLeft + r, w.hitRight - r);
@@ -342,7 +342,7 @@ const Game = (() => {
     // Столкновение со стаей. Щит спасает, как и от стены, но особь при
     // этом гибнет — иначе дрон со щитом застревал бы в косяке
     if (Swarm.hitTest(Drone.x, droneDepth, PX_PER_M)) {
-      if (shieldTime <= 0) _crash('СЪЕДЕН');
+      if (shieldTime <= 0) _crash('eaten');
       else Swarm.shootAt(Drone.x, droneDepth, PX_PER_M);
     }
 
@@ -350,11 +350,11 @@ const Game = (() => {
     // никуда не девается — значит под щитом дрон может в нём застрять.
     // Поэтому щит здесь только отменяет смерть, а выталкивать приходится
     // игроку: тварь не расстреливается и не исчезает.
-    if (Nest.hitTest(Drone.x, droneDepth, PX_PER_M, _elapsed) && shieldTime <= 0) _crash('СЪЕДЕН');
+    if (Nest.hitTest(Drone.x, droneDepth, PX_PER_M, _elapsed) && shieldTime <= 0) _crash('eaten');
 
     // Угорь. Щит спасает так же, как от гнезда: тварь не расстреливается
     // и никуда не девается, выталкиваться игроку придётся самому.
-    if (Eel.hitTest(Drone.x, droneDepth, PX_PER_M, _elapsed) && shieldTime <= 0) _crash('СЪЕДЕН');
+    if (Eel.hitTest(Drone.x, droneDepth, PX_PER_M, _elapsed) && shieldTime <= 0) _crash('eaten');
   }
 
   // Что делает каждая кнопка. Одно место на всю игру: добавится экран —
@@ -368,7 +368,17 @@ const Game = (() => {
     else if (id === 'howto')    Screens.set('howto');
     else if (id === 'back')     Screens.set('title');
     else if (id === 'sound')    Screens.toggleMute();
-    else if (id === 'settings') { /* экран отрисован, но ещё не вписан */ }
+    else if (id === 'settings')   Screens.set('settings');
+    // Переключатели внутри окна настроек. Экран не закрывается: игрок
+    // щёлкает несколько штук подряд и выходит сам.
+    else if (id === 'set_music')  Screens.setOpt('music', !Screens.opt('music'));
+    else if (id === 'set_sound')  Screens.toggleMute();
+    else if (id === 'set_vibro') {
+      const v = !Screens.opt('vibro');
+      Screens.setOpt('vibro', v);
+      if (v) Screens.buzz(25);          // включил — сразу почувствовал
+    }
+    else if (id === 'set_lang')   Lang.toggle();
   }
 
   // Гибель. Кадр ЗАМИРАЕТ и остаётся на экране под окном — игрок видит,
@@ -386,7 +396,12 @@ const Game = (() => {
     }
     // Совет выбирается ОДИН раз на показ окна. Если тянуть случайный на
     // каждом кадре, он будет мигать шестьдесят раз в секунду.
-    tip = Screens.TIPS[Math.floor(Math.random() * Screens.TIPS.length)];
+    const tl = Screens.tips();
+    tip = tl[Math.floor(Math.random() * tl.length)];
+    // Короткий толчок на гибель. Единственное, что сегодня стоит за
+    // настройками по-настоящему, поэтому и проверка включённости — внутри
+    // Screens.buzz, а не здесь.
+    Screens.buzz([0, 40, 60, 90]);
     setTimeout(() => { if (!running) Screens.set('gameover'); }, 700);
   }
 
@@ -820,8 +835,8 @@ const Game = (() => {
     ctx.fillStyle = 'rgba(95,216,255,0.4)';
     ctx.font = '10px sans-serif';
     ctx.textAlign = 'center';
-    ctx.fillText('БЫСТРЕЕ', c.x, c.y - R + 13);
-    ctx.fillText('ТОРМОЗ',  c.x, c.y + R - 5);
+    ctx.fillText(Lang.t('faster'), c.x, c.y - R + 13);
+    ctx.fillText(Lang.t('brake'),  c.x, c.y + R - 5);
 
     // Ручка
     // Ручку рисуем по СЫРОМУ отклонению пальца, а не по усиленному:
@@ -853,13 +868,13 @@ const Game = (() => {
     ctx.fillStyle = '#6fa8bd';
     ctx.font = '10px sans-serif';
     ctx.textAlign = 'center';
-    ctx.fillText('ЭНЕРГИЯ', CONFIG.CANVAS_W / 2, y + h + 12);
+    ctx.fillText(Lang.t('energy'), CONFIG.CANVAS_W / 2, y + h + 12);
   }
 
   function _drawEffects() {
     const items = [];
-    if (shieldTime > 0) items.push({ t: shieldTime, max: CONFIG.PICKUP.SHIELD_TIME, c: '#7fd4ff', n: 'ЩИТ' });
-    if (weaponTime > 0) items.push({ t: weaponTime, max: CONFIG.PICKUP.WEAPON_TIME, c: '#ff8a6e', n: 'ОГОНЬ' });
+    if (shieldTime > 0) items.push({ t: shieldTime, max: CONFIG.PICKUP.SHIELD_TIME, c: '#7fd4ff', n: Lang.t('shield') });
+    if (weaponTime > 0) items.push({ t: weaponTime, max: CONFIG.PICKUP.WEAPON_TIME, c: '#ff8a6e', n: Lang.t('fire') });
     items.forEach((it, i) => {
       const y = 104 + i * 20;
       ctx.fillStyle = it.c;
@@ -896,11 +911,11 @@ const Game = (() => {
     ctx.fillStyle = '#9fe8ff';
     ctx.font = 'bold 26px sans-serif';
     ctx.textAlign = 'center';
-    ctx.fillText(Math.floor(depth) + ' м', CONFIG.CANVAS_W / 2, 40);
+    ctx.fillText(Math.floor(depth) + ' ' + Lang.t('m'), CONFIG.CANVAS_W / 2, 40);
 
     ctx.font = '13px sans-serif';
     ctx.fillStyle = '#6fa8bd';
-    ctx.fillText('рекорд ' + Math.floor(bestDepth) + ' м', CONFIG.CANVAS_W / 2, 62);
+    ctx.fillText(Lang.t('best') + ' ' + Math.floor(bestDepth) + ' ' + Lang.t('m'), CONFIG.CANVAS_W / 2, 62);
 
     if (!CONFIG.DEBUG) return;
 
@@ -924,7 +939,10 @@ const Game = (() => {
   // Что знает экран о заходе. Собрано в одном месте: экранов будет
   // четыре, и каждому нужен свой кусок этих же чисел.
   function _screenData() {
-    return { best: bestDepth, depth, caps: capsules, cause, tip, fresh: freshBest };
+    // Причину храним КЛЮЧОМ, а переводим в момент показа: иначе смена
+    // языка оставила бы на экране старое слово.
+    return { best: bestDepth, depth, caps: capsules,
+             cause: cause ? Lang.t(cause) : '', tip, fresh: freshBest };
   }
 
   function loop(now) {
