@@ -55,6 +55,7 @@ const Game = (() => {
       { name: 'eel_head',   w: CONFIG.EEL.HEAD_W,   h: CONFIG.EEL.HEAD_H },
       { name: 'eel_head',   w: CONFIG.EEL.HEAD_W,   h: CONFIG.EEL.HEAD_H, flip: true },
       { name: 'sound_slash', w: 43, h: 41 },
+      { name: 'pause_icon',  w: 40, h: 40 },
       { name: 'drone_body', w: 36, h: 32 },
       { name: 'drone_glow', w: 36, h: 32 },
       { name: 'drone_gun',  w: 36, h: 32 },
@@ -164,7 +165,14 @@ const Game = (() => {
     // Пока показан экран, касания принадлежат ему, а не дрону.
     // Иначе палец, которым игрок жмёт «НАЧАТЬ», тут же уводит дрон вбок.
     const onStart = (cx, cy) => {
+      // Снятие паузы — по НАЖАТИЮ, а не по отпусканию. Иначе одно касание
+      // кнопки ставило паузу нажатием и тут же снимало отпусканием: до
+      // замера я этого не увидел, глубина продолжала расти.
+      if (Screens.get() === 'paused') { Screens.set('game'); return; }
       if (Screens.get() !== 'game') { Screens.down(cx, cy); return; }
+      // Пауза перехватывает касание ДО управления: иначе палец, нажавший
+      // на паузу, успевал бы увести дрон.
+      if (running && _inPauseBtn(cx, cy)) { Screens.set('paused'); return; }
       const m = CONFIG.CONTROL_MODE;
       if (m === 'joystick')      joyMove(cx, cy);
       else if (m === 'strip')    stripTarget(cx);
@@ -180,6 +188,7 @@ const Game = (() => {
       else                       Drone.setTarget(cx);
     };
     const release = (cx, cy) => {
+      if (Screens.get() === 'paused') return;   // снимается нажатием, см. onStart
       if (Screens.get() !== 'game') { _screenAction(Screens.up(cx, cy)); return; }
       anchorX = null; joyRelease();
     };
@@ -864,7 +873,24 @@ const Game = (() => {
     });
   }
 
+  // Кнопка паузы на игровом поле. Положение то же, что в «Тайне
+  // астероида», — левый верхний угол, 40x40 при тех же 480x854. Справа
+  // вверху её ставить нельзя: там на заставках живёт значок звука, и
+  // палец привыкнет жать не туда.
+  const PAUSE_BTN = [8, 12, 40, 40];
+
+  function _drawPauseBtn() {
+    const img = Sprites.at('pause_icon', PAUSE_BTN[2], PAUSE_BTN[3], false);
+    if (img) ctx.drawImage(img, PAUSE_BTN[0], PAUSE_BTN[1], PAUSE_BTN[2], PAUSE_BTN[3]);
+  }
+
+  function _inPauseBtn(x, y) {
+    const [bx, by, bw, bh] = PAUSE_BTN;
+    return x >= bx - 6 && x <= bx + bw + 6 && y >= by - 6 && y <= by + bh + 6;
+  }
+
   function _drawHud() {
+    _drawPauseBtn();
     _drawEnergyBar();
     _drawEffects();
     ctx.fillStyle = '#9fe8ff';
@@ -909,7 +935,7 @@ const Game = (() => {
     else {
       // Под окном конца погружения оставляем ЗАМОРОЖЕННЫЙ кадр: update не
       // зовём, draw зовём. Игрок видит ту самую стену или ту самую пасть.
-      if (st === 'gameover') draw(false);
+      if (st === 'gameover' || st === 'paused') draw(false);
       Screens.draw(ctx, _screenData());
     }
     requestAnimationFrame(loop);

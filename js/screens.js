@@ -210,6 +210,27 @@ const Screens = (() => {
 
   function draw(ctx, data) {
     const im = imgs[state];
+
+    // ВРЕМЕННАЯ ПАУЗА. Отрисованного экрана паузы ещё нет — он ждёт
+    // художника. Но кнопка на игровом поле уже есть, и кнопка, которая
+    // ничего не делает, хуже отсутствующей. Поэтому пауза РАБОТАЕТ:
+    // кадр замирает, поверх ложится затемнение и слово. Придёт картинка
+    // — этот кусок уйдёт целиком, а поведение останется тем же.
+    if (state === 'paused' && !im) {
+      ctx.save();
+      ctx.fillStyle = 'rgba(2,10,18,0.66)';
+      ctx.fillRect(0, 0, CONFIG.CANVAS_W, CONFIG.CANVAS_H);
+      ctx.fillStyle = '#9fe8ff';
+      ctx.font = 'bold 34px sans-serif';
+      _inkCenter(ctx, 'ПАУЗА', [0, CONFIG.CANVAS_H / 2 - 60, CONFIG.CANVAS_W, 50]);
+      ctx.fillStyle = 'rgba(190,225,255,0.75)';
+      ctx.font = '14px sans-serif';
+      _inkCenter(ctx, 'коснитесь, чтобы продолжить',
+                 [0, CONFIG.CANVAS_H / 2 + 4, CONFIG.CANVAS_W, 24]);
+      ctx.restore();
+      return;
+    }
+
     if (!im) {                      // картинка ещё едет — не чёрный экран
       ctx.fillStyle = '#0a1a26';
       ctx.fillRect(0, 0, CONFIG.CANVAS_W, CONFIG.CANVAS_H);
