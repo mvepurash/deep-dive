@@ -75,11 +75,23 @@
 - **Duration** переключить с Auto на Custom и задать длину.
 - **Title** — сразу наше имя файла, иначе в библиотеке не разобраться.
 
-**Общий Exclude Styles для всех треков этой игры** (171 символ):
+**Общий Exclude Styles для всех треков этой игры** (188 символов):
 
 ```
-vocals, drums, percussion, melody lead, guitar, piano, orchestral swell, crescendo, build-up, drop, intro, outro, fade out, major key, uplifting, resolution, trailer braam
+vocals, choir, singing, humming, ambient drone, new age, meditation, slow ballad, piano ballad, orchestral strings, major key, uplifting, happy, resolution, intro, outro, fade in, fade out
 ```
+
+**Барабанов и перкуссии в этом списке нет намеренно.** В первой редакции
+они там стояли, и владелец, послушав первый же трек, сказал прямо:
+«похоронный марш, ни динамики, ни адреналина». Он прав. Я строил промты
+по замеру старой музыки «Тайны Астероида», а надо было строить по игре.
+Игрок здесь **падает, и всё быстрее** — музыка без пульса спорит с
+картинкой. Разбор ошибки целиком лежит в файле промтов той игры.
+
+Из тех же соображений убраны слова `static arrangement` и
+`continuous loop`: просьба ничего не менять — это и есть просьба о
+тягомотине. Петлю вырежу я, это моя работа, и ради неё не надо
+жертвовать живостью трека.
 
 К каждому треку дан полный вариант строки стиля и **короткий, до 200
 символов**, на случай если поле ограничено по длине.
@@ -88,75 +100,52 @@ vocals, drums, percussion, melody lead, guitar, piano, orchestral swell, crescen
 
 ## 2. Титул
 
-**Title:** `dive_title` · **длина:** 1:00–1:30
+**Title:** `dive_title` · **длина:** 1:30 (194 символа)
 
 ```
-underwater ambient, 56 BPM, slow deep pressure swell, warm low drone, single sonar ping with long wet reverb tail, hydrophone noise floor, faint whale-like moan far below, vast, patient, ominous, continuous loop
+instrumental, dark cinematic underwater electronic, 72 BPM, slow pulsing sub-bass, lone sonar ping with long wet reverb, hydrophone noise, faint whale moan far below, vast, ominous, anticipation
 ```
 
-короткий (184):
-
-```
-underwater ambient, 56 BPM, slow deep pressure swell, warm low drone, lone sonar ping with long wet reverb, hydrophone noise, faint whale moan far below, vast, ominous, continuous loop
-```
-
-Титул — это обещание. Он должен звучать так, будто внизу что-то есть, но
-не пугать: пугать будет игра.
+Титул — единственное место, где можно дышать медленно. Но и он не
+колыбельная: `anticipation` значит, что внизу что-то ждёт.
 
 ---
 
 ## 3. Погружение, пояс 1 — «Шельф»
 
-**Title:** `dive_belt_1` · **длина:** 2:00–3:00
+**Title:** `dive_belt_1` · **длина:** 3:00 (201 символ)
 
 ```
-underwater ambient with forward motion, 72 BPM, steady low descent pulse, sub-bass drone, C minor, hydrophone water noise, slow rising filter sweep, muffled hull pressure groans, sparse sonar blips, tense, open, continuous loop
+instrumental, driving underwater electronic, 110 BPM, pulsing sub-bass sequence, propulsive kick, hydrophone noise, metallic sonar blips on the beat, cold minor arpeggio, descent, accelerating pressure
 ```
 
-короткий (183):
-
-```
-underwater ambient, forward motion, 72 BPM, steady low descent pulse, sub-bass drone, C minor, hydrophone water noise, rising filter sweep, muffled hull groans, tense, continuous loop
-```
-
-`forward motion` — ключевые слова всего файла. В «Тайне Астероида» музыка
-стоит на месте, потому что астронавт стоит на месте. Здесь игрок
-**падает**, и трек, который никуда не едет, будет спорить с картинкой.
+`descent` и `accelerating` — ключевые слова всего файла. В «Тайне
+Астероида» астронавт стоит на месте, и музыка может стоять с ним. Здесь
+игрок падает, и скорость падения за полминуты удваивается.
 
 ---
 
 ## 4. Погружение, пояс 2 — «Террасы»
 
-**Title:** `dive_belt_2` · **длина:** 2:00–3:00
+**Title:** `dive_belt_2` · **длина:** 3:00 (201 символ)
 
 ```
-underwater ambient, 84 BPM, insistent low pulse, dark sub-bass, detuned string drone, creaking pressure hull under load, irregular metallic knocks from outside, water rushing past, claustrophobic, pressure building, continuous loop
-```
-
-короткий (186):
-
-```
-underwater ambient, 84 BPM, insistent low pulse, dark sub-bass, detuned string drone, creaking pressure hull, metallic knocks outside, water rushing past, claustrophobic, continuous loop
+instrumental, heavy underwater techno, 124 BPM, distorted sub-bass ostinato, driving tom pattern, creaking pressure hull, metallic knocks on the beat, dissonant stabs, claustrophobic, pressure building
 ```
 
 ---
 
 ## 5. Погружение, пояс 3 — «Труба»
 
-**Title:** `dive_belt_3` · **длина:** 2:00–3:00
+**Title:** `dive_belt_3` · **длина:** 3:00 (197 символов)
 
 ```
-underwater ambient, 96 BPM, relentless driving low pulse, distorted sub-bass, dissonant low strings, deep groans of something alive and very large, hull stress cracks, suffocating, relentless, continuous loop
+instrumental, relentless industrial techno, 138 BPM, distorted driving bassline, pounding kick, dissonant low strings, groans of something alive and huge, hull stress cracks, suffocating, no let-up
 ```
 
-короткий (185):
-
-```
-underwater ambient, 96 BPM, relentless driving low pulse, distorted sub-bass, dissonant low strings, groans of something alive and huge, hull stress cracks, suffocating, continuous loop
-```
-
-`something alive and very large` — на этой глубине живут угри и гнёзда,
-и самое неприятное в них то, что они больше тебя.
+Три пояса — это 110, 124 и 138 ударов. Разгон слышен, даже если игрок не
+думает о музыке: именно так ритм перестаёт быть метрономом, на что была
+главная жалоба по самой игре (см. `tz_levels_ru.md`).
 
 ---
 
@@ -165,14 +154,12 @@ underwater ambient, 96 BPM, relentless driving low pulse, distorted sub-bass, di
 **Title:** `dive_gameover` · **длина:** 1:00, подрежу до 30–45 секунд
 
 ```
-underwater ambient, very slow, heavy muffled sub-bass impact with long wet reverb tail, sinking low cello note, bubbles rising away, everything going quiet and far, pressure silence, low-passed, resigned, sparse
+instrumental, very slow, heavy muffled sub-bass impact with long wet reverb tail, sinking low cello note, bubbles rising away, everything going quiet and far, pressure silence, low-passed, resigned
 ```
 
-короткий (173):
-
-```
-underwater ambient, very slow, muffled sub-bass impact with long wet reverb tail, sinking low cello note, bubbles rising away, pressure silence, low-passed, resigned, sparse
-```
+**Exclude** — к общему списку допишите `, drums, percussion, cymbals`.
+Здесь барабаны лишние, и это не противоречие: похоронный марш плох там,
+где игрок играет, и уместен там, где он уже проиграл.
 
 Не траурно. Игрок услышит это десятки раз за вечер: тихо и глухо
 переносится, траур — нет.
