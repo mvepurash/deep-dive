@@ -111,58 +111,106 @@ instrumental, dark cinematic underwater electronic, 72 BPM, slow pulsing sub-bas
 
 ---
 
-## 3. Погружение, пояс 1 — «Шельф»
+## 3. ОСНОВНАЯ ТЕМА ПОГРУЖЕНИЯ — делать первой
 
-**Title:** `dive_belt_1` · **длина:** 3:00 (201 символ)
+Поясов в коде ещё нет, поэтому один трек сейчас тянет на себе всю игру:
+от первой секунды до рекордной глубины. Значит, он обязан и ехать
+вперёд, и не надоесть за десять минут.
+
+Что должно быть слышно: **игрок падает, и падает всё быстрее.** Скорость
+за первые полминуты удваивается и только потом упирается в потолок.
+Музыка, которая стоит на месте, спорит с картинкой — это та самая
+ошибка, из-за которой первая редакция вышла тягомотиной.
+
+И второе, не менее важное: **это не «Тайна Астероида» под водой.** Там
+сухой аналоговый секвенсор и железо в вакууме. Здесь вода: всё отзывается,
+хвосты реверберации длинные, низ не щёлкает, а давит. Поэтому в запретах
+ниже стоят `retro synthwave` и `80s analog arpeggio` — чтобы Suno не
+утащил нас обратно в соседнюю игру.
+
+### Два направления на сравнение
+
+**Вариант А — «Падение».** Ставка на ощущение полёта вниз: тяжёлый
+барабанный ход, как далёкий двигатель, и бас, который едет.
+
+**Title:** `dive_main_A` · **Styles** (200 символов):
 
 ```
-instrumental, driving underwater electronic, 110 BPM, pulsing sub-bass sequence, propulsive kick, hydrophone noise, metallic sonar blips on the beat, cold minor arpeggio, descent, accelerating pressure
+instrumental, dark underwater electronic, 118 BPM, driving sub-bass pulse, deep tom pattern like a distant engine, wet sonar blips on the beat, hydrophone noise, cold minor riff, falling, accelerating
 ```
 
-`descent` и `accelerating` — ключевые слова всего файла. В «Тайне
-Астероида» астронавт стоит на месте, и музыка может стоять с ним. Здесь
-игрок падает, и скорость падения за полминуты удваивается.
+**Вариант Б — «Давление».** Жёстче и быстрее, ближе к технo. Ставка на
+то, что игроку некогда выдохнуть.
 
----
+**Title:** `dive_main_B` · **Styles** (202 символа):
 
-## 4. Погружение, пояс 2 — «Террасы»
+```
+instrumental, dark aquatic techno, 132 BPM, relentless pounding kick, distorted sub-bass ostinato, metallic hull knocks on the beat, dissonant stabs, wet reverb tails, claustrophobic, relentless descent
+```
 
-**Title:** `dive_belt_2` · **длина:** 3:00 (201 символ)
+**Exclude styles — общий для этой игры** (186 символов):
+
+```
+vocals, choir, singing, retro synthwave, 80s analog arpeggio, ambient drone, new age, slow ballad, piano, orchestral strings, major key, uplifting, happy, resolution, intro, outro, fade out
+```
+
+**Остальные поля:** Lyrics пусто, **Duration → Custom, 3 минуты**,
+Style Influence 80–90 %, Weirdness 20–30 %.
+
+### Если пояса всё-таки будем делать
+
+Тогда выбранный вариант становится первым поясом, а к нему добираются
+ещё два — та же палитра, но быстрее и злее. Строки готовы:
+
+**Пояс 2, «Террасы»** (`dive_belt_2`, 124 BPM):
 
 ```
 instrumental, heavy underwater techno, 124 BPM, distorted sub-bass ostinato, driving tom pattern, creaking pressure hull, metallic knocks on the beat, dissonant stabs, claustrophobic, pressure building
 ```
 
----
-
-## 5. Погружение, пояс 3 — «Труба»
-
-**Title:** `dive_belt_3` · **длина:** 3:00 (197 символов)
+**Пояс 3, «Труба»** (`dive_belt_3`, 138 BPM):
 
 ```
 instrumental, relentless industrial techno, 138 BPM, distorted driving bassline, pounding kick, dissonant low strings, groans of something alive and huge, hull stress cracks, suffocating, no let-up
 ```
 
-Три пояса — это 110, 124 и 138 ударов. Разгон слышен, даже если игрок не
-думает о музыке: именно так ритм перестаёт быть метрономом, на что была
-главная жалоба по самой игре (см. `tz_levels_ru.md`).
+Разгон 118 → 124 → 138 слышен, даже если игрок не думает о музыке.
+Именно так ритм перестаёт быть метрономом — главная жалоба по самой игре,
+разбор в `tz_levels_ru.md`.
 
 ---
 
-## 6. Гибель
+## 4. Гибель — здесь есть развилка
 
-**Title:** `dive_gameover` · **длина:** 1:00, подрежу до 30–45 секунд
+Владелец предложил не генерировать отдельный трек, а **взять тот, что уже
+сделан для экрана гибели «Тайны Астероида»**. Решение за ним, но два
+соображения записываю, чтобы оно было осознанным.
+
+**Против.** Это ровно то, что запрещало собственное правило этого файла:
+ничего из «Тайны Астероида» не переносить. И смерти в играх РАЗНЫЕ.
+Там — удушье в вакууме, сухо, слух отказывает. Здесь — давление и пасть
+на километровой глубине: вода, пузыри, длинные мокрые хвосты. Один и тот
+же трек в одном из двух мест прозвучит мимо.
+
+**За.** Скачиваний всего 20 в месяц, а трек гибели игрок слушает недолго
+и невнимательно. Экономия реальная.
+
+**Средний путь, который я предлагаю.** Берём тот же файл, но я делаю из
+него **подводную версию**: срезаю верх, добавляю длинную мокрую
+реверберацию и подмешиваю пузыри. Материал один, звучат по-разному, а
+скачивание потрачено одно. Если на слух разница окажется мала — тогда и
+сгенерируем отдельный трек, промт ниже лежит готовым.
+
+**Если всё-таки генерировать свой** — `dive_gameover`, Duration 1 минута:
 
 ```
 instrumental, very slow, heavy muffled sub-bass impact with long wet reverb tail, sinking low cello note, bubbles rising away, everything going quiet and far, pressure silence, low-passed, resigned
 ```
 
 **Exclude** — к общему списку допишите `, drums, percussion, cymbals`.
-Здесь барабаны лишние, и это не противоречие: похоронный марш плох там,
-где игрок играет, и уместен там, где он уже проиграл.
-
-Не траурно. Игрок услышит это десятки раз за вечер: тихо и глухо
-переносится, траур — нет.
+Здесь барабаны лишние, и это не противоречие с основной темой:
+похоронный марш плох там, где игрок играет, и уместен там, где он уже
+проиграл.
 
 ---
 
