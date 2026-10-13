@@ -128,34 +128,60 @@ instrumental, dark cinematic underwater electronic, 72 BPM, slow pulsing sub-bas
 ниже стоят `retro synthwave` и `80s analog arpeggio` — чтобы Suno не
 утащил нас обратно в соседнюю игру.
 
+### Чему научил трек «Тайны Астероида»
+
+Фон, который там приняли, я замерил, когда резал петлю, и цифры меняют
+выбор здесь. Он получился **ярким и быстрым**: спектральный центроид
+2258 Гц, выше 2 кГц — 45 % всей энергии, ниже 200 Гц — только 22 %, темп
+около 130 ударов.
+
+Значит, вариант «132 удара, техно» для погружения опасен: он рискует
+выйти близнецом соседней игры, а правило этого файла — чтобы трек нельзя
+было переставить из одной игры в другую. Разводить надо не только
+палитрой, но и **весом**: там верх, здесь низ.
+
+Поэтому в строках ниже добавлено `muffled low-passed top end`, а в
+запреты — `bright synths`, `shimmering pads`, `high arpeggio`.
+**Начинайте с варианта А.**
+
 ### Два направления на сравнение
 
-**Вариант А — «Падение».** Ставка на ощущение полёта вниз: тяжёлый
+**Вариант А — «Падение». Рекомендую.** Ощущение полёта вниз: тяжёлый
 барабанный ход, как далёкий двигатель, и бас, который едет.
 
-**Title:** `dive_main_A` · **Styles** (200 символов):
+**Title:** `dive_main_A` · **Styles** (226 символов):
 
 ```
-instrumental, dark underwater electronic, 118 BPM, driving sub-bass pulse, deep tom pattern like a distant engine, wet sonar blips on the beat, hydrophone noise, cold minor riff, falling, accelerating
+instrumental, dark underwater electronic, 118 BPM, heavy sub-bass pulse, deep tom pattern like a distant engine, muffled low-passed top end, wet sonar blips on the beat, hydrophone noise, cold minor riff, falling, accelerating
 ```
 
-**Вариант Б — «Давление».** Жёстче и быстрее, ближе к технo. Ставка на
-то, что игроку некогда выдохнуть.
-
-**Title:** `dive_main_B` · **Styles** (202 символа):
+короткий, если поле ограничено (193):
 
 ```
-instrumental, dark aquatic techno, 132 BPM, relentless pounding kick, distorted sub-bass ostinato, metallic hull knocks on the beat, dissonant stabs, wet reverb tails, claustrophobic, relentless descent
+instrumental, dark underwater electronic, 118 BPM, heavy sub-bass pulse, deep tom pattern like a distant engine, muffled low-passed top, wet sonar blips, hydrophone noise, falling, accelerating
 ```
 
-**Exclude styles — общий для этой игры** (186 символов):
+**Вариант Б — «Давление».** Жёстче и быстрее, ближе к техно. Берите
+вторым, для сравнения, а не первым: см. разбор выше.
+
+**Title:** `dive_main_B` · **Styles** (210 символов):
 
 ```
-vocals, choir, singing, retro synthwave, 80s analog arpeggio, ambient drone, new age, slow ballad, piano, orchestral strings, major key, uplifting, happy, resolution, intro, outro, fade out
+instrumental, dark aquatic techno, 132 BPM, relentless pounding kick, distorted sub-bass ostinato, muffled low-passed top end, metallic hull knocks on the beat, dissonant stabs, wet reverb tails, claustrophobic
+```
+
+**Exclude styles — общий для этой игры** (236 символов):
+
+```
+vocals, choir, singing, retro synthwave, 80s analog arpeggio, bright synths, shimmering pads, high arpeggio, ambient drone, new age, slow ballad, piano, orchestral strings, major key, uplifting, happy, resolution, intro, outro, fade out
 ```
 
 **Остальные поля:** Lyrics пусто, **Duration → Custom, 3 минуты**,
 Style Influence 80–90 %, Weirdness 20–30 %.
+
+**Что проверить в готовом треке, прежде чем тратить скачивание:**
+включите его и посмотрите на игру. Дрон падает и разгоняется — если
+музыка при этом стоит, трек не тот, каким бы красивым он ни был.
 
 ### Если пояса всё-таки будем делать
 
