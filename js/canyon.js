@@ -12,7 +12,7 @@ const Canyon = (() => {
   const C = CONFIG.CANYON;
 
   // Фазы волны идут по кругу
-  const PHASE = { SQUEEZE: 'squeeze', THROAT: 'throat', RELEASE: 'release', REST: 'rest' };
+  const PHASE = { SQUEEZE: 'squeeze', THROAT: 'throat', RELEASE: 'release', REST: 'rest', FORK: 'fork' };
 
   // Кто давит в текущей волне
   const SIDE = { LEFT: 'left', RIGHT: 'right', BOTH: 'both' };
@@ -20,12 +20,32 @@ const Canyon = (() => {
   let waves = [];        // рассчитанные волны: от какой глубины до какой, какая фаза
   let builtTo = 0;       // до какой глубины уже построено
   let waveIndex = 0;     // номер следующей волны
+  let nextForkWave = 0;  // на какой волне ставить следующую развилку
 
   function reset() {
     waves = [];
     builtTo = 0;
     waveIndex = 0;
+    nextForkWave = -1;   // посчитается при первой же постройке
     _buildAhead(3000);   // строим с запасом вперёд
+  }
+
+  // Первая развилка привязана к ВРЕМЕНИ падения, а не к номеру волны:
+  // волны разной длины, и «через три волны» на старте и на глубине —
+  // это совсем разные моменты игры.
+  function _forkDue(d) {
+    const F = C.FORK;
+    if (_timeAt(d) < F.FIRST_AT) return false;
+    if (nextForkWave < 0) { nextForkWave = waveIndex; return true; }
+    return waveIndex >= nextForkWave;
+  }
+
+  function _rollForkType() {
+    const T = C.FORK.TYPES;
+    const r = Math.random();
+    if (r < T.both) return 'both';
+    if (r < T.both + T.dead) return 'dead';
+    return 'merge';
   }
 
   function _rnd(v, jitter) {
@@ -71,6 +91,26 @@ const Canyon = (() => {
       waves.push({ from: d, to: d + p.throatLen, phase: PHASE.THROAT, side, minWidth: p.minWidth }); d += p.throatLen;
       waves.push({ from: d, to: d + release, phase: PHASE.RELEASE, side, minWidth: p.minWidth }); d += release;
       waves.push({ from: d, to: d + p.restLen, phase: PHASE.REST, side, minWidth: p.minWidth }); d += p.restLen;
+
+      // РАЗВИЛКА идёт после передышки — отдельной фазой, а не поверх
+      // горловины. Складывать выбор рукава с точностью прохода нельзя:
+      // это два разных испытания, и вместе они дают проход, который
+      // физически не пройти. То же правило, что и у наростов.
+      if (_forkDue(d)) {
+        const F = C.FORK;
+        const len = _rnd(F.TIME * _fallSpeedAt(d), C.JITTER);
+        waves.push({
+          from: d, to: d + len, phase: PHASE.FORK, side, minWidth: p.minWidth,
+          fork: {
+            type: _rollForkType(),
+            // Куда закроется тупик и насколько остров смещён от середины.
+            dieLeft: Math.random() < 0.5,
+            wobble: (Math.random() * 2 - 1) * F.WOBBLE,
+          },
+        });
+        d += len;
+        nextForkWave = waveIndex + Math.max(1, Math.round(_rnd(F.EVERY, 0.5)));
+      }
 
       builtTo = d;
       waveIndex++;
@@ -126,12 +166,43 @@ const Canyon = (() => {
   function _widthAt(d) {
     const s = _segmentAt(d);
     const t = (d - s.from) / (s.to - s.from);
+    if (s.phase === PHASE.FORK) return C.FORK.WIDTH;
     switch (s.phase) {
       case PHASE.SQUEEZE: return C.WIDE_WIDTH + (s.minWidth - C.WIDE_WIDTH) * _smooth(t);
       case PHASE.THROAT:  return s.minWidth;
       case PHASE.RELEASE: return s.minWidth + (C.WIDE_WIDTH - s.minWidth) * _smooth(t);
       default:            return C.WIDE_WIDTH;
     }
+  }
+
+  // ---- Скала-остров на развилке ----
+  //
+  // Две огибающие, и обе сделаны профилями, а не формулой на глаз:
+  //
+  // half(t) — полуширина острова. Растёт из нуля, держится, уходит в ноль.
+  //   Нулевые концы обязательны: иначе камень возникал бы и исчезал
+  //   скачком, а у игрока на экране это выглядит как телепорт стены.
+  //
+  // close(t) — насколько остров ПРИЖАТ к стене. Для тупика он к концу
+  //   доезжает до неё вплотную, закрывая свой рукав, и уже там тает.
+  //   Именно в таком порядке: сначала закрыть, потом исчезнуть. Если
+  //   растворить его раньше, тупик перестанет быть тупиком.
+  function _forkProfile(type, t) {
+    const sm = _smooth;
+    const GROW = 0.18;
+    let half;
+    if (type === 'merge') {
+      half = t < GROW ? sm(t / GROW)
+           : t < 0.62 ? 1
+           : sm(Math.max(0, (1 - t) / 0.38));
+    } else {
+      half = t < GROW ? sm(t / GROW)
+           : t < 0.85 ? 1
+           : sm(Math.max(0, (1 - t) / 0.15));
+    }
+    // Прижим только у тупика
+    const close = type === 'dead' ? sm(Math.max(0, Math.min(1, (t - 0.45) / 0.40))) : 0;
+    return { half, close };
   }
 
   // Границы прохода на глубине d.
@@ -211,6 +282,29 @@ const Canyon = (() => {
     left  -= _rough(d, 0.0) * rs;
     right += _rough(d, 3.7) * rs;
 
+    // Скала-остров на развилке. Считается ПОСЛЕ того, как стены встали
+    // на свои места: остров живёт внутри прохода, а не рядом с ним.
+    let pillar = null;
+    if (s.phase === PHASE.FORK && s.fork) {
+      const F = C.FORK;
+      const t = (d - s.from) / (s.to - s.from);
+      const pr = _forkProfile(s.fork.type, t);
+      const hw = F.PILLAR * 0.5 * pr.half;
+      if (hw > 0.5) {
+        const mid = (left + right) * 0.5 + (right - left) * s.fork.wobble;
+        let x1 = mid - hw, x2 = mid + hw;
+        if (pr.close > 0) {
+          // Тупик: двигаем остров целиком к своей стене
+          const toL = s.fork.dieLeft;
+          const tx1 = toL ? left : right - hw * 2;
+          const tx2 = tx1 + hw * 2;
+          x1 = x1 + (tx1 - x1) * pr.close;
+          x2 = x2 + (tx2 - x2) * pr.close;
+        }
+        pillar = [x1, x2];
+      }
+    }
+
     // Наросты — это уже опасная граница, по ней и считаем столкновение
     return {
       left, right,
@@ -218,6 +312,7 @@ const Canyon = (() => {
       hitLeft: left + growL,          // фактическая граница с наростом
       hitRight: right - growR,
       growL, growR,
+      pillar,                         // [x1, x2] или null
       phase: s.phase, side: s.side,
     };
   }

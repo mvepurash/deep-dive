@@ -49,7 +49,15 @@ const Pickups = (() => {
       if (chance > 0 && Math.random() < chance) {
         // Ставим внутри чистого прохода, не вплотную к наростам
         const pad = P.RADIUS + 10;
-        const lo = w.hitLeft + pad, hi = w.hitRight - pad;
+        let lo = w.hitLeft + pad, hi = w.hitRight - pad;
+        // На развилке проход разрезан скалой надвое. Без этой ветки
+        // капсула вставала бы ВНУТРИ камня — видимая, но недосягаемая,
+        // и игрок бил бы в скалу, пытаясь её достать.
+        if (w.pillar) {
+          const inLeft = Math.random() < 0.5;
+          if (inLeft) hi = Math.min(hi, w.pillar[0] - pad);
+          else        lo = Math.max(lo, w.pillar[1] + pad);
+        }
         if (hi > lo) {
           items.push({
             depth: d,
@@ -76,7 +84,13 @@ const Pickups = (() => {
       // она всплывала прямо сквозь породу. Поджимаем её внутрь прохода —
       // капсулу как бы вытесняет сужающимися стенками.
       const w = Canyon.getWalls(it.depth);
-      const lo = w.hitLeft + pad, hi = w.hitRight - pad;
+      let lo = w.hitLeft + pad, hi = w.hitRight - pad;
+      // Та же забота на всплытии: остров вырастает НА ХОДУ, и капсула,
+      // спокойно стоявшая в проходе, через секунду оказывается в камне.
+      if (w.pillar) {
+        if (it.x < (w.pillar[0] + w.pillar[1]) * 0.5) hi = Math.min(hi, w.pillar[0] - pad);
+        else                                          lo = Math.max(lo, w.pillar[1] + pad);
+      }
       if (hi <= lo) { it.taken = true; continue; }   // проход уже капсулы
       if (it.x < lo) it.x = lo;
       if (it.x > hi) it.x = hi;

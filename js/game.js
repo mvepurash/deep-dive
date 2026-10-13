@@ -331,6 +331,8 @@ const Game = (() => {
       const w = Canyon.getWalls(sh.depth);
       if (sh.x <= w.hitLeft)  { cleared.push({ depth: sh.depth, side: 'left'  }); _spark(sh.x, sh.depth, '#ffb070'); sh.dead = true; }
       if (sh.x >= w.hitRight) { cleared.push({ depth: sh.depth, side: 'right' }); _spark(sh.x, sh.depth, '#ffb070'); sh.dead = true; }
+      // Об остров пуля тоже гаснет: это камень, а не вода
+      if (w.pillar && sh.x > w.pillar[0] && sh.x < w.pillar[1]) { _spark(sh.x, sh.depth, '#ffb070'); sh.dead = true; }
     }
     shots = shots.filter(sh => !sh.dead && sh.depth < depth + CONFIG.CANVAS_H / PX_PER_M + 50);
     // Расчищенные участки живут недолго — только пока видны
@@ -345,6 +347,18 @@ const Game = (() => {
       // Со щитом дрон выживает, но сквозь породу не проходит: упираемся
       // в стену, иначе щит превращался в режим полёта через камень
       else Drone.clampInside(w.hitLeft + r, w.hitRight - r);
+    }
+
+    // Скала-остров на развилке. Это та же порода, что и стены, поэтому и
+    // смерть та же. Со щитом выталкиваем в БЛИЖАЙШИЙ рукав, а не всегда
+    // в один: иначе щит сам решал бы за игрока, куда он поедет.
+    if (w.pillar && Drone.x + r > w.pillar[0] && Drone.x - r < w.pillar[1]) {
+      if (shieldTime <= 0) _crash('crushed');
+      else {
+        const toLeft = Drone.x < (w.pillar[0] + w.pillar[1]) * 0.5;
+        if (toLeft) Drone.clampInside(w.hitLeft + r, w.pillar[0] - r);
+        else        Drone.clampInside(w.pillar[1] + r, w.hitRight - r);
+      }
     }
 
     // Столкновение со стаей. Щит спасает, как и от стены, но особь при
@@ -529,6 +543,17 @@ const Game = (() => {
   // совпадения игрок не доживёт.
   let _pat = null, _pat2 = null;
 
+  // Обратный проход по правой кромке острова: контур обязан замкнуться,
+  // иначе заливка вытечет на весь экран.
+  function _closePillar(p, endPy, STEP) {
+    for (let py = endPy - STEP; py >= 0; py -= STEP) {
+      const pl = Canyon.getWalls(depth + py / PX_PER_M).pillar;
+      if (!pl) break;
+      p.lineTo(pl[1], py);
+    }
+    p.closePath();
+  }
+
   function _wallPath(STEP) {
     const p = new Path2D();
     p.moveTo(0, 0);
@@ -537,6 +562,19 @@ const Game = (() => {
     p.moveTo(CONFIG.CANVAS_W, 0);
     for (let py = 0; py <= CONFIG.CANVAS_H; py += STEP) p.lineTo(Canyon.getWalls(depth + py / PX_PER_M).right, py);
     p.lineTo(CONFIG.CANVAS_W, CONFIG.CANVAS_H); p.closePath();
+
+    // Остров на развилке — такой же кусок породы, поэтому добавляется в
+    // ТОТ ЖЕ контур: заливается тем же узором, темнеет по той же глубине
+    // и обводится той же линией прохода. Отдельная отрисовка развела бы
+    // камень острова с камнем стен, и это было бы видно сразу.
+    let open = false;
+    for (let py = 0; py <= CONFIG.CANVAS_H; py += STEP) {
+      const pl = Canyon.getWalls(depth + py / PX_PER_M).pillar;
+      if (pl && !open) { p.moveTo(pl[0], py); open = true; }
+      else if (pl) p.lineTo(pl[0], py);
+      else if (open) { _closePillar(p, py, STEP); open = false; }
+    }
+    if (open) _closePillar(p, CONFIG.CANVAS_H + STEP, STEP);
     return p;
   }
 
@@ -601,6 +639,22 @@ const Game = (() => {
       if (py === 0) ctx.moveTo(w.right, py); else ctx.lineTo(w.right, py);
     }
     ctx.stroke();
+
+    // Кромки острова на развилке. Без них камень читается как провал
+    // в темноту: на глубине порода почти чёрная, и единственное, что
+    // отделяет стену от воды, — вот эта светлая линия. Остров — такая
+    // же стена, значит и линия ему нужна такая же.
+    for (const edge of [0, 1]) {
+      let drawing = false;
+      ctx.beginPath();
+      for (let py = 0; py <= CONFIG.CANVAS_H; py += STEP) {
+        const pl = Canyon.getWalls(depth + py / PX_PER_M).pillar;
+        if (!pl) { if (drawing) { ctx.stroke(); ctx.beginPath(); drawing = false; } continue; }
+        if (!drawing) { ctx.moveTo(pl[edge], py); drawing = true; }
+        else ctx.lineTo(pl[edge], py);
+      }
+      if (drawing) ctx.stroke();
+    }
 
     // Снаряды — вертикальный след, а не круглая искра
     const SR = CONFIG.PICKUP.SHOT_RADIUS, SL = CONFIG.PICKUP.SHOT_LEN;
