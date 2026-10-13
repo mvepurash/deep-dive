@@ -106,6 +106,12 @@ const Canyon = (() => {
             // Куда закроется тупик и насколько остров смещён от середины.
             dieLeft: Math.random() < 0.5,
             wobble: (Math.random() * 2 - 1) * F.WOBBLE,
+            // Своя ширина у каждой скалы: одинаковые острова читаются
+            // как повтор декорации, а не как новое место.
+            size: 1 + (Math.random() * 2 - 1) * F.PILLAR_VARY,
+            // Наклон: в какую сторону и насколько остров уедет к выходу.
+            lean: (Math.random() * 2 - 1),
+            seed: Math.random() * 1000,
           },
         });
         d += len;
@@ -166,7 +172,14 @@ const Canyon = (() => {
   function _widthAt(d) {
     const s = _segmentAt(d);
     const t = (d - s.from) / (s.to - s.from);
-    if (s.phase === PHASE.FORK) return C.FORK.WIDTH;
+    if (s.phase === PHASE.FORK) {
+      // Разгоняем и сводим ширину, а не меняем её скачком: соседние фазы
+      // стоят на WIDE_WIDTH, и прыжок с 380 на 300 за один кадр давал
+      // кромке 5372 px/с при пределе дрона в 440.
+      const R = C.FORK.RAMP;
+      const k = _smooth(Math.min(1, Math.min(t, 1 - t) / R));
+      return C.WIDE_WIDTH + (C.FORK.WIDTH - C.WIDE_WIDTH) * k;
+    }
     switch (s.phase) {
       case PHASE.SQUEEZE: return C.WIDE_WIDTH + (s.minWidth - C.WIDE_WIDTH) * _smooth(t);
       case PHASE.THROAT:  return s.minWidth;
@@ -289,10 +302,19 @@ const Canyon = (() => {
       const F = C.FORK;
       const t = (d - s.from) / (s.to - s.from);
       const pr = _forkProfile(s.fork.type, t);
-      const hw = F.PILLAR * 0.5 * pr.half;
+      const hw = F.PILLAR * 0.5 * (s.fork.size || 1) * pr.half;
       if (hw > 0.5) {
         const mid = (left + right) * 0.5 + (right - left) * s.fork.wobble;
         let x1 = mid - hw, x2 = mid + hw;
+
+        // НАКЛОН: остров едет вбок по ходу развилки, и один рукав
+        // заужается на глазах. Сдвиг ограничен запасом, который можно
+        // съесть, не сделав рукав непроходимым, — считаем его здесь, а
+        // не подбираем на глаз.
+        const slack = Math.max(0, (right - left) * 0.5 - hw - F.BRANCH_MIN);
+        x1 += (s.fork.lean || 0) * slack * F.LEAN * pr.half;
+        x2 += (s.fork.lean || 0) * slack * F.LEAN * pr.half;
+
         if (pr.close > 0) {
           // Тупик: двигаем остров целиком к своей стене
           const toL = s.fork.dieLeft;
@@ -301,7 +323,14 @@ const Canyon = (() => {
           x1 = x1 + (tx1 - x1) * pr.close;
           x2 = x2 + (tx2 - x2) * pr.close;
         }
-        pillar = [x1, x2];
+
+        // Фактура кромок — тот же шум, что у стен, только тише. У стен он
+        // отодвигает породу НАРУЖУ, здесь — тоже наружу от прохода, то
+        // есть внутрь острова: иначе шум съедал бы обещанный рукав.
+        const rs = F.ROUGH_SCALE * pr.half;
+        x1 += _rough(d, s.fork.seed) * rs;
+        x2 -= _rough(d, s.fork.seed + 5.3) * rs;
+        if (x2 - x1 > 1) pillar = [x1, x2];
       }
     }
 
