@@ -63,6 +63,7 @@ const Game = (() => {
       { name: 'wall_rock', h: 1, tint: 0.55 },   // второй слой, ломает повтор
     ]);
     Screens.load();
+    Music.load();
     _bindInput();
     start();
     Screens.set('title');     // игра готова, но ждём на титуле
@@ -86,6 +87,10 @@ const Game = (() => {
     Eel.reset();
     _elapsed = 0;
     running = true;
+    // Музыку включаем, только если мы ДЕЙСТВИТЕЛЬНО в погружении.
+    // init() зовёт start() заранее, чтобы первый кадр был готов, и без
+    // этой проверки фон начинал играть прямо на титуле.
+    if (Screens.get() === 'game') Music.play('main');
   }
 
   // Площадка неподвижна: центр всегда в одной точке внизу экрана.
@@ -165,14 +170,17 @@ const Game = (() => {
     // Пока показан экран, касания принадлежат ему, а не дрону.
     // Иначе палец, которым игрок жмёт «НАЧАТЬ», тут же уводит дрон вбок.
     const onStart = (cx, cy) => {
+      // Любое первое касание разблокирует звук. Раньше этой строки
+      // браузер не даст играть ничему, и музыки не будет до конца сессии.
+      Music.prime();
       // Снятие паузы — по НАЖАТИЮ, а не по отпусканию. Иначе одно касание
       // кнопки ставило паузу нажатием и тут же снимало отпусканием: до
       // замера я этого не увидел, глубина продолжала расти.
-      if (Screens.get() === 'paused') { Screens.set('game'); return; }
+      if (Screens.get() === 'paused') { Screens.set('game'); Music.resume(); return; }
       if (Screens.get() !== 'game') { Screens.down(cx, cy); return; }
       // Пауза перехватывает касание ДО управления: иначе палец, нажавший
       // на паузу, успевал бы увести дрон.
-      if (running && _inPauseBtn(cx, cy)) { Screens.set('paused'); return; }
+      if (running && _inPauseBtn(cx, cy)) { Screens.set('paused'); Music.pause(); return; }
       const m = CONFIG.CONTROL_MODE;
       if (m === 'joystick')      joyMove(cx, cy);
       else if (m === 'strip')    stripTarget(cx);
@@ -363,7 +371,7 @@ const Game = (() => {
     if (!id) return;
     if (id === 'start')    { Screens.set('game'); start(); }
     else if (id === 'again')    { Screens.set('game'); start(); }
-    else if (id === 'menu')       Screens.set('title');
+    else if (id === 'menu')     { Screens.set('title'); Music.stop(); }
     else if (id === 'ad')       { /* реклама ещё не подключена */ }
     else if (id === 'howto')    Screens.set('howto');
     else if (id === 'back')     Screens.set('title');
@@ -372,7 +380,7 @@ const Game = (() => {
     // Переключатели внутри окна настроек. Экран не закрывается: игрок
     // щёлкает несколько штук подряд и выходит сам.
     else if (id === 'set_music')  Screens.setOpt('music', !Screens.opt('music'));
-    else if (id === 'set_sound')  Screens.toggleMute();
+    else if (id === 'set_sound')  Screens.setOpt('sounds', !Screens.opt('sounds'));
     else if (id === 'set_vibro') {
       const v = !Screens.opt('vibro');
       Screens.setOpt('vibro', v);
@@ -402,7 +410,10 @@ const Game = (() => {
     // настройками по-настоящему, поэтому и проверка включённости — внутри
     // Screens.buzz, а не здесь.
     Screens.buzz([0, 40, 60, 90]);
-    setTimeout(() => { if (!running) Screens.set('gameover'); }, 700);
+    // Музыку переключаем ВМЕСТЕ с экраном, а не в момент удара: 0.7 с
+    // замершего кадра под фоновым треком — это и есть пауза, в которую
+    // игрок понимает, что всё кончилось.
+    setTimeout(() => { if (!running) { Screens.set('gameover'); Music.play('over'); } }, 700);
   }
 
   // Наросты на стенах.

@@ -124,27 +124,41 @@ const Screens = (() => {
   // браузер умеет её сам. Музыка и звуки СОХРАНЯЮТСЯ, но звучать им пока
   // нечему: в игре нет ни одного аудиофайла. Поэтому в окне они помечены
   // словом «скоро», и это не заглушка-обманка, а предупреждение игроку.
-  const OPT = { music: true, sounds: true, vibro: true };
+  //
+  // ЧЕТЫРЁХ ФЛАГОВ, А НЕ ТРЁХ. Значок динамика на титуле — ОБЩИЙ
+  // выключатель, а не строка «ЗВУКИ». Пока они были одним флагом,
+  // выключение звуковых эффектов глушило бы и музыку, а перечёркнутый
+  // динамик на титуле не глушил бы её вовсе. Игрок ждёт от динамика
+  // ровно одного: нажал — стало тихо всё.
+  const OPT = { master: true, music: true, sounds: true, vibro: true };
   try {
     for (const k in OPT) {
       const v = localStorage.getItem('dd_' + k);
       if (v !== null) OPT[k] = v === '1';
     }
-    // Старый ключ выключенного звука: был до окна настроек.
-    if (localStorage.getItem('dd_muted') === '1') OPT.sounds = false;
+    // Старый ключ выключенного звука: был до разделения на общий и
+    // категории. Он означал именно «выключить всё».
+    if (localStorage.getItem('dd_muted') === '1') OPT.master = false;
   } catch (e) {}
 
   function _save(k) {
     try { localStorage.setItem('dd_' + k, OPT[k] ? '1' : '0'); } catch (e) {}
-    if (k === 'sounds') {
-      try { localStorage.setItem('dd_muted', OPT.sounds ? '0' : '1'); } catch (e) {}
+    if (k === 'master') {
+      try { localStorage.setItem('dd_muted', OPT.master ? '0' : '1'); } catch (e) {}
     }
   }
 
   function opt(k) { return !!OPT[k]; }
-  function setOpt(k, v) { if (k in OPT) { OPT[k] = !!v; _save(k); } return OPT[k]; }
-  function isMuted() { return !OPT.sounds; }
-  function toggleMute() { setOpt('sounds', !OPT.sounds); return !OPT.sounds; }
+  function setOpt(k, v) {
+    if (k in OPT) {
+      OPT[k] = !!v; _save(k);
+      // Музыка должна отозваться сразу, а не со следующего экрана.
+      if ((k === 'master' || k === 'music') && typeof Music !== 'undefined') Music.refresh();
+    }
+    return OPT[k];
+  }
+  function isMuted() { return !OPT.master; }
+  function toggleMute() { setOpt('master', !OPT.master); return !OPT.master; }
 
   // Короткий толчок. Единственная настройка, за которой сегодня стоит
   // настоящее железо, поэтому и вызов тут, рядом с галочкой, а не
@@ -438,7 +452,7 @@ const Screens = (() => {
       const key = S_ROWS[i], y = S_ROW_Y[i];
       // Звука в игре ещё нет вовсе, и молчать об этом нельзя: переключатель,
       // который ничего не меняет, игрок считает поломкой, а не задумкой.
-      const dead = (key === 'music' || key === 'sounds');
+      const dead = (key === 'sounds');     // музыка уже звучит, звуков ещё нет
 
       ctx.fillStyle = dead ? 'rgba(190,225,255,0.5)' : '#dff2ff';
       ctx.font = 'bold 17px sans-serif';

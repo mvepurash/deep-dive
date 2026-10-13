@@ -5,3 +5,7 @@
 # петли в assets/music/.
 *.wav
 /asteroid_*.mp3
+
+# Исходники треков с Suno здесь не хранятся (см. выше). Готовые петли
+# лежат в assets/music/.
+/dive_*.mp3
