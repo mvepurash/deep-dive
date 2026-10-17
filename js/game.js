@@ -49,6 +49,8 @@ const Game = (() => {
       { name: 'razor_01', h: CONFIG.SWARM.RADIUS * 2, swim: true },
       { name: 'nest_base', w: CONFIG.NEST.BASE_OUT, h: CONFIG.NEST.BASE_PX },
       { name: 'nest_base', w: CONFIG.NEST.BASE_OUT, h: CONFIG.NEST.BASE_PX, flip: true },
+      { name: 'hydra_idle',   w: CONFIG.HYDRA.W_PX, h: CONFIG.HYDRA.H_PX },
+      { name: 'hydra_strike', w: CONFIG.HYDRA.W_PX, h: CONFIG.HYDRA.H_PX },
       { name: 'eel_burrow', w: CONFIG.EEL.BURROW_W, h: CONFIG.EEL.BURROW_H },
       { name: 'eel_burrow', w: CONFIG.EEL.BURROW_W, h: CONFIG.EEL.BURROW_H, flip: true },
       { name: 'eel_body',   w: CONFIG.EEL.BODY_W,   h: CONFIG.EEL.BODY_H },
@@ -84,6 +86,7 @@ const Game = (() => {
     capsules = 0; cause = ''; freshBest = false;
     Swarm.reset();
     Nest.reset();
+    Hydra.reset();
     Eel.reset();
     _elapsed = 0;
     running = true;
@@ -285,6 +288,7 @@ const Game = (() => {
     Pickups.update(depth, aheadDepth, dt);
     Swarm.update(depth, aheadDepth, dt);
     Nest.update(depth, aheadDepth, PX_PER_M, dt);
+    Hydra.update(depth, aheadDepth, PX_PER_M, dt);
     const droneDepthNow = depth + (CONFIG.DRONE_Y / PX_PER_M);
     // Угрю нужны дрон и скорость падения: он бьёт по месту и подгадывает
     // момент под подход, а не живёт по своему секундомеру
@@ -323,6 +327,8 @@ const Game = (() => {
       // сломана. Оружие их не убивает — оно покупает время.
       const hn = Nest.shootAt(sh.x, sh.depth, PX_PER_M, _elapsed);
       if (hn) { _spark(hn.x, hn.y, '#cfe8ff'); sh.dead = true; continue; }
+      const hh = Hydra.shootAt(sh.x, sh.depth, PX_PER_M);
+      if (hh) { _spark(hh.x, hh.y, '#ffb070'); sh.dead = true; continue; }
       const he = Eel.shootAt(sh.x, sh.depth, PX_PER_M, _elapsed);
       if (he) {
         _spark(he.x, he.y, he.kind === 'eye' ? '#ff6a4a' : '#cfe8ff');
@@ -373,6 +379,10 @@ const Game = (() => {
     // Поэтому щит здесь только отменяет смерть, а выталкивать приходится
     // игроку: тварь не расстреливается и не исчезает.
     if (Nest.hitTest(Drone.x, droneDepth, PX_PER_M, _elapsed) && shieldTime <= 0) _crash('eaten');
+
+    // Гидра. Щит спасает, но тварь не убивается и не уходит — выталкиваться
+    // придётся игроку, как и от гнезда.
+    if (Hydra.hitTest(Drone.x, droneDepth, PX_PER_M) && shieldTime <= 0) _crash('eaten');
 
     // Угорь. Щит спасает так же, как от гнезда: тварь не расстреливается
     // и никуда не девается, выталкиваться игроку придётся самому.
@@ -672,6 +682,7 @@ const Game = (() => {
 
     Pickups.draw(ctx, depth, PX_PER_M, CONFIG.DRONE_Y);
     Nest.draw(ctx, depth, PX_PER_M, _elapsed);
+    Hydra.draw(ctx, depth, PX_PER_M);
     Eel.draw(ctx, depth, PX_PER_M, _elapsed);
     Swarm.draw(ctx, depth, PX_PER_M, _elapsed);
 
