@@ -56,7 +56,11 @@ const Hydra = (() => {
     return [x * c - y * s, x * s + y * c];
   }
 
-  const HULL_LOC = H.HULL.map(([fx, fy]) => [_lx(fx), _ly(fy)]);
+  // Геометрия каждого кадра — в его собственной точке крепления
+  const _lxS = fx => (fx - H.PIVOT_STRIKE[0]) * W;
+  const _lyS = fy => (fy - H.PIVOT_STRIKE[1]) * HH;
+  const HULL_LOC = H.HULL_IDLE.map(([fx, fy]) => [_lx(fx), _ly(fy)])
+    .concat(H.HULL_STRIKE.map(([fx, fy]) => [_lxS(fx), _lyS(fy)]));
 
   // Наибольший вынос головы от крепления вглубь прохода (px) при повороте th.
   // Для выпуклой оболочки максимум линейной функции достигается в вершине,
@@ -267,14 +271,19 @@ const Hydra = (() => {
 
     // Центр короны плавно едет от покоя к раскрытию: скачок хитбокса за
     // кадр был бы гибелью без предупреждения
-    const cx = H.CROWN[0] + (H.CROWN_STRIKE[0] - H.CROWN[0]) * h.k;
-    const cy = H.CROWN[1] + (H.CROWN_STRIKE[1] - H.CROWN[1]) * h.k;
-    const pc = toWorld(_lx(cx), _ly(cy));
+    const ci = [_lx(H.CROWN[0]), _ly(H.CROWN[1])];
+    const cs = [_lxS(H.CROWN_STRIKE[0]), _lyS(H.CROWN_STRIKE[1])];
+    const cx = ci[0] + (cs[0] - ci[0]) * h.k;
+    const cy = ci[1] + (cs[1] - ci[1]) * h.k;
+    const pc = toWorld(cx, cy);
     out.push({ x: pc.x, y: pc.y, r: H.CROWN_R * HH, head: true });
 
-    const tips = h.k < 0.5 ? H.TIPS_IDLE : H.TIPS_STRIKE;
-    for (const [fx, fy] of tips) {
-      const p = toWorld(_lx(fx), _ly(fy));
+    // Кончики каждого кадра — в его точке крепления; в переходе берём свой набор
+    const tips = h.k < 0.5
+      ? H.TIPS_IDLE.map(([fx, fy]) => [_lx(fx), _ly(fy)])
+      : H.TIPS_STRIKE.map(([fx, fy]) => [_lxS(fx), _lyS(fy)]);
+    for (const [lx, ly] of tips) {
+      const p = toWorld(lx, ly);
       out.push({ x: p.x, y: p.y, r: H.TIP_R * HH, head: true });
     }
     return out;
@@ -338,7 +347,6 @@ const Hydra = (() => {
       if (!idle || !strike) continue;   // игра идёт и без картинки; хитбокс остаётся
 
       const fade = h.alive ? 1 : h.fade / H.DEAD_TIME;
-      const ox = -H.PIVOT[0] * W, oy = -H.PIVOT[1] * HH;
 
       ctx.save();
       ctx.translate(h.wallX, py);
@@ -346,9 +354,9 @@ const Hydra = (() => {
       ctx.rotate(h.th);
 
       ctx.globalAlpha = fade * (1 - h.k);
-      ctx.drawImage(idle, ox, oy, W, HH);
+      ctx.drawImage(idle, -H.PIVOT[0] * W, -H.PIVOT[1] * HH, W, HH);
       ctx.globalAlpha = fade * h.k;
-      ctx.drawImage(strike, ox, oy, W, HH);
+      ctx.drawImage(strike, -H.PIVOT_STRIKE[0] * W, -H.PIVOT_STRIKE[1] * HH, W, HH);
       ctx.restore();
       ctx.globalAlpha = 1;
 
