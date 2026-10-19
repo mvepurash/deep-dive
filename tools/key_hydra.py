@@ -27,9 +27,11 @@ def key(path):
         excess = g - np.maximum(r, b)           # насколько зелёный сильнее красного и синего
     alpha = 255 * (1 - np.clip((excess - 25) / 55, 0, 1))
     if bg_kind(im) == 'magenta':
+        # магентовую кайму гасим только на кромке, внутренность не трогаем
+        edge = alpha < 250
+        r2 = np.where(edge, np.minimum(r, g * 1.2 + 12), r)
+        b2 = np.where(edge, np.minimum(b, g * 1.2 + 12), b)
         g2 = g
-        r2 = np.minimum(r, g + 4 + 0 * r)       # гасим магентовую кайму
-        b2 = np.minimum(b, g + 4 + 0 * b)
     else:
         g2 = np.minimum(g, np.maximum(r, b) + 4)
         r2, b2 = r, b

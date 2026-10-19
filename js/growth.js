@@ -67,6 +67,7 @@ const Growth = (() => {
     // одно на всю игру — испытания не складываются.
     if (typeof Nest !== 'undefined' && Nest.covers(depth, side)) return 0;
     if (typeof Hydra !== 'undefined' && Hydra.covers(depth, side)) return 0;
+    if (typeof Maw !== 'undefined' && Maw.covers(depth, side)) return 0;
 
     // На норе угря — тем более. Единственное предупреждение, которое есть
     // у игрока, — это светящийся глаз в устье. Коралл поверх норы его
