@@ -52,6 +52,7 @@ const Game = (() => {
       { name: 'hydra_idle',   w: CONFIG.HYDRA.W_PX, h: CONFIG.HYDRA.H_PX },
       { name: 'hydra_strike', w: CONFIG.HYDRA.W_PX, h: CONFIG.HYDRA.H_PX },
       { name: 'maw_open',     w: CONFIG.MAW.W_PX,   h: CONFIG.MAW.H_PX },
+      { name: 'maw_half',     w: CONFIG.MAW.W_PX,   h: CONFIG.MAW.H_PX },
       { name: 'maw_closed',   w: CONFIG.MAW.W_PX,   h: CONFIG.MAW.H_PX },
       { name: 'eel_burrow', w: CONFIG.EEL.BURROW_W, h: CONFIG.EEL.BURROW_H },
       { name: 'eel_burrow', w: CONFIG.EEL.BURROW_W, h: CONFIG.EEL.BURROW_H, flip: true },

@@ -36,6 +36,7 @@ const Sprites = (() => {
     hydra_idle:    'assets/creatures/hydra_idle.webp',
     hydra_strike:  'assets/creatures/hydra_strike.webp',
     maw_open:      'assets/creatures/maw_open.webp',
+    maw_half:      'assets/creatures/maw_half.webp',
     maw_closed:    'assets/creatures/maw_closed.webp',
     eel_head:      'assets/creatures/eel_head.webp',
     eel_body:      'assets/creatures/eel_body.webp',

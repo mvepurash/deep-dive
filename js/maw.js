@@ -1,16 +1,19 @@
 // ===== maw.js =====
 // ============================================================
-// ПАСТЬ — веха. Перекрывает ущелье по ширине: зубы стоят у стен, между
-// ними отверстие по центру. По мере приближения дрона зубы сходятся.
+// ПАСТЬ — веха. Занимает всю ширину передышки: губы прилегают к стенам,
+// зубы-полусферы образуют дугу, между вершинами по центру — глотка-сфинктер.
+// Правила прохождения — docs/tz_creatures_ru.md (1, 1a–1d):
+//   1.  Проход всегда возможен, если войти по центру (96 px между вершинами).
+//   1a. Смертельны только зубы. Губы и десны проходятся без урона.
+//   1c. Сомкнутая пасть проходима только по центральной оси, в пике смыкания.
+//       Затем пасть отходит: проход расширяется, пасть уменьшается и темнеет.
+//   1d. По бокам пустот нет: пасть занимает всю ширину коридора.
 //
-// Правила прохождения (docs/tz_creatures_ru.md, согласованы):
-//   1. Проход всегда возможен, если войти по центру: отверстие не закрывается
-//      ниже HOLE_RX_MIN, то есть 96 px поперёк при дроне 36 px.
-//   2. Смыкание идёт CLOSE_S секунд падения (не меньше 0.5 с).
-//   3. Смыкание начинается до входа: сигнал виден заранее.
-//
-// Прогресс смыкания p — функция глубины, а не таймера. Значит, картинка и
-// хитбокс всегда показывают одно и то же состояние, и пауза ничего не ломает.
+// Всё состояние — функция глубины дрона, а не таймера: картинка и проход
+// всегда показывают одно и то же, пауза ничего не ломает.
+//   start  — начало смыкания (до входа в пасть на SIGNAL_LEAD)
+//   closed — пик смыкания, проход минимальный (96 px по центру)
+//   closed .. closed+RETREAT — отход: проход расширяется, масштаб уменьшается
 // ============================================================
 
 const Maw = (() => {
@@ -19,7 +22,7 @@ const Maw = (() => {
   const W = M.W_PX, HH = M.H_PX;
   const DR = CONFIG.DRONE_RADIUS;
 
-  let list = [];            // {depth (центр в метрах), xc (центр отверстия, px), alive}
+  let list = [];            // {depth (центр в метрах), xc (центр по X, px)}
   let nextSpawn = 0;
   let armed = false;
   let _pxPerM = 1;
@@ -29,28 +32,39 @@ const Maw = (() => {
   function reset() { list = []; nextSpawn = 0; armed = false; _lastDepth = null; }
 
   function _span(pxPerM) { return HH / pxPerM; }
-
-  // Время смыкания в метрах падения при текущей скорости
   function _closeM() { return M.CLOSE_S * _v; }
+  function _retreatM() { return M.RETREAT_S * _v; }
 
-  // Прогресс смыкания 0..1 по глубине дрона. Сигнал начинается заранее:
-  // при входе в пасть смыкание уже на SIGNAL_LEAD.
-  function _p(m, droneDepth, pxPerM) {
-    const top = m.depth - _span(pxPerM) / 2;
-    const cm = _closeM();
-    const start = top - M.SIGNAL_LEAD * cm;
-    let u = (droneDepth - start) / cm;
+  // Гладкая кривая 0..1 по линейной величине u
+  function _ramp(u) {
     u = Math.max(0, Math.min(1, u));
     return u * u * (3 - 2 * u);
   }
 
-  // Полуширина отверстия при прогрессе p
-  function _rx(p) { return M.HOLE_RX + (M.HOLE_RX_MIN - M.HOLE_RX) * p; }
+  // Состояние пасти на глубине дрона dd:
+  //   p  — смыкание 0..1 (открыто -> сомкнуто)
+  //   q  — отход 0..1 (после пика)
+  //   s  — масштаб спрайта (1 -> 1 - SHRINK)
+  //   rx — полуширина прохода на экране, px
+  function _state(m, dd, pxPerM) {
+    const span = _span(pxPerM);
+    const top = m.depth - span / 2;
+    const cm = _closeM();
+    const rm = _retreatM();
+    const start = top - M.SIGNAL_LEAD * cm;
+    const closed = start + cm;
+    const p = _ramp((dd - start) / cm);
+    const q = _ramp((dd - closed) / rm);
+    let rx = M.HOLE_RX + (M.HOLE_RX_MIN - M.HOLE_RX) * p;
+    rx = rx + (M.HOLE_RX - rx) * q;
+    const s = 1 - M.SHRINK * q;
+    return { p, q, s, rx: rx * s };
+  }
 
   // ---------- появление ----------
 
   // Можно ли поставить пасть с центром на глубине dc: вся высота в передышке
-  // и ущелье не уже ширины спрайта
+  // и ущелье не уже ширины спрайта (правило 1d: пасть перекрывает коридор)
   function _fit(dc, pxPerM) {
     const span = _span(pxPerM);
     const top = Canyon.getWalls(dc - span / 2), bot = Canyon.getWalls(dc + span / 2);
@@ -74,7 +88,7 @@ const Maw = (() => {
         if (fit) { placed = { d, fit }; break; }
       }
       if (!placed) { nextSpawn += M.SEARCH_AHEAD; continue; }
-      list.push({ depth: placed.d, xc: placed.fit.xc, alive: true });
+      list.push({ depth: placed.d, xc: placed.fit.xc });
       nextSpawn = placed.d + M.SPAWN_EVERY;
     }
   }
@@ -90,32 +104,31 @@ const Maw = (() => {
     }
     _lastDepth = depth;
     _maybeSpawn(depth, aheadDepth, pxPerM);
-    // Пасть ушла за верх экрана целиком
+    // Пасть ушла за верх экрана целиком (с запасом на отход)
     const span = _span(pxPerM);
-    list = list.filter(m => m.depth + span / 2 > depth - 10);
+    list = list.filter(m => m.depth + span / 2 + _closeM() + _retreatM() > depth - 10);
   }
 
   // ---------- столкновение и выстрел ----------
 
+  // Дрон гибнет, если выходит за проход по центру. Зубы — единственная опасность.
   function hitTest(droneX, droneDepth, pxPerM) {
     const span = _span(pxPerM);
     for (const m of list) {
       if (droneDepth < m.depth - span / 2 || droneDepth > m.depth + span / 2) continue;
-      const rx = _rx(_p(m, droneDepth, pxPerM));
-      // Зубы сходятся к центру: за пределами отверстия дрон цел только если
-      // целиком внутри него, с учётом своего радиуса
-      if (Math.abs(droneX - m.xc) > rx - DR) return true;
+      const st = _state(m, droneDepth, pxPerM);
+      if (Math.abs(droneX - m.xc) > st.rx - DR) return true;
     }
     return false;
   }
 
-  // Пуля в зубы поглощается, в отверстие пролетает. Пасть не убивается.
+  // Пуля в зубы поглощается, в глотку пролетает. Пасть не умирает.
   function shootAt(sx, sDepth, pxPerM) {
     const span = _span(pxPerM);
     for (const m of list) {
       if (sDepth < m.depth - span / 2 || sDepth > m.depth + span / 2) continue;
-      const rx = _rx(_p(m, sDepth, pxPerM));
-      if (Math.abs(sx - m.xc) > rx) return { x: sx, y: sDepth };
+      const st = _state(m, sDepth, pxPerM);
+      if (Math.abs(sx - m.xc) > st.rx) return { x: sx, y: sDepth };
     }
     return null;
   }
@@ -131,29 +144,43 @@ const Maw = (() => {
 
   // ---------- отрисовка ----------
 
+  // Три спрайта: открыто (p=0) -> наполовину (p=0.5) -> сомкнуто (p=1).
+  // Переход между соседними кадрами — кроссфейд по p.
+  function _alphas(p) {
+    if (p <= 0.5) return { open: 1 - 2 * p, half: 2 * p, closed: 0 };
+    return { open: 0, half: 2 - 2 * p, closed: 2 * p - 1 };
+  }
+
   function draw(ctx, depth, pxPerM) {
     const open = Sprites.at('maw_open', W, HH, false);
+    const half = Sprites.at('maw_half', W, HH, false);
     const shut = Sprites.at('maw_closed', W, HH, false);
-    if (!open || !shut) return;   // игра идёт и без картинки; хитбокс остаётся
+    if (!open || !half || !shut) return;   // без картинки хитбокс остаётся
+
     const droneDepth = depth + CONFIG.DRONE_Y / pxPerM;
     for (const m of list) {
-      const py = (m.depth - depth) * pxPerM;
-      if (py < -HH / 2 - 40 || py > CONFIG.CANVAS_H + HH / 2 + 40) continue;
-      const p = _p(m, droneDepth, pxPerM);
-      ctx.globalAlpha = 1 - p;
-      ctx.drawImage(open, m.xc - W / 2, py - HH / 2, W, HH);
-      ctx.globalAlpha = p;
-      ctx.drawImage(shut, m.xc - W / 2, py - HH / 2, W, HH);
+      const st = _state(m, droneDepth, pxPerM);
+      const w = W * st.s, h = HH * st.s;
+      const cy = (m.depth - depth) * pxPerM;
+      if (cy < -h / 2 - 40 || cy > CONFIG.CANVAS_H + h / 2 + 40) continue;
+      const x = m.xc - w / 2, y = cy - h / 2;
+      const a = _alphas(st.p);
+
+      const dim = st.q > 0 && 'filter' in ctx;
+      if (dim) ctx.filter = `brightness(${1 - M.DIM * st.q})`;
+      if (a.open > 0)   { ctx.globalAlpha = a.open;   ctx.drawImage(open, x, y, w, h); }
+      if (a.half > 0)   { ctx.globalAlpha = a.half;   ctx.drawImage(half, x, y, w, h); }
+      if (a.closed > 0) { ctx.globalAlpha = a.closed; ctx.drawImage(shut, x, y, w, h); }
       ctx.globalAlpha = 1;
+      if (dim) ctx.filter = 'none';
 
       if (M.DEBUG) {
         ctx.save();
         ctx.strokeStyle = 'rgba(255,60,60,0.9)';
         ctx.lineWidth = 1;
-        const rx = _rx(p);
         ctx.beginPath();
-        ctx.moveTo(m.xc - rx, py - HH / 2); ctx.lineTo(m.xc - rx, py + HH / 2);
-        ctx.moveTo(m.xc + rx, py - HH / 2); ctx.lineTo(m.xc + rx, py + HH / 2);
+        ctx.moveTo(m.xc - st.rx, cy - h / 2); ctx.lineTo(m.xc - st.rx, cy + h / 2);
+        ctx.moveTo(m.xc + st.rx, cy - h / 2); ctx.lineTo(m.xc + st.rx, cy + h / 2);
         ctx.stroke();
         ctx.restore();
       }

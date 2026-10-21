@@ -1,5 +1,5 @@
-# Вырезает фон из исходников пасти (открытая и сомкнутая) в общей рамке.
-# Фон магента (#FF00FF). Запуск из корня репозитория: python3 tools/key_maw.py
+# Вырезает фон из исходников пасти (три состояния: open, half, closed) в общей
+# рамке. Фон магента (#FF00FF). Запуск из корня репозитория: python3 tools/key_maw.py
 import os
 import numpy as np
 from PIL import Image
@@ -31,7 +31,7 @@ def key(path):
 
 
 def main():
-    keyed = {n: key(SRC + f'maw_{n}_src.png') for n in ['open', 'closed']}
+    keyed = {n: key(SRC + f'maw_{n}_src.png') for n in ['open', 'half', 'closed']}
     boxes = []
     for rgba in keyed.values():
         ys, xs = np.where(rgba[..., 3] > 8)
