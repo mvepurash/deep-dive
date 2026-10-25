@@ -38,6 +38,8 @@ const Sprites = (() => {
     maw_open:      'assets/creatures/maw_open.webp',
     maw_half:      'assets/creatures/maw_half.webp',
     maw_closed:    'assets/creatures/maw_closed.webp',
+    crusher_body:  'assets/creatures/crusher_body.webp',
+    crusher_jaw:   'assets/creatures/crusher_jaw.webp',
     eel_head:      'assets/creatures/eel_head.webp',
     eel_body:      'assets/creatures/eel_body.webp',
     // Нора уже тонирована кривой стены при сборке, а не в игре: она одна,

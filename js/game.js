@@ -54,6 +54,8 @@ const Game = (() => {
       { name: 'maw_open',     w: CONFIG.MAW.W_PX,   h: CONFIG.MAW.H_PX },
       { name: 'maw_half',     w: CONFIG.MAW.W_PX,   h: CONFIG.MAW.H_PX },
       { name: 'maw_closed',   w: CONFIG.MAW.W_PX,   h: CONFIG.MAW.H_PX },
+      { name: 'crusher_body', w: CONFIG.CRUSHER.FRAME_PX, h: CONFIG.CRUSHER.FRAME_PX },
+      { name: 'crusher_jaw',  w: CONFIG.CRUSHER.FRAME_PX * CONFIG.CRUSHER.JAW_SCALE, h: CONFIG.CRUSHER.FRAME_PX * CONFIG.CRUSHER.JAW_SCALE },
       { name: 'eel_burrow', w: CONFIG.EEL.BURROW_W, h: CONFIG.EEL.BURROW_H },
       { name: 'eel_burrow', w: CONFIG.EEL.BURROW_W, h: CONFIG.EEL.BURROW_H, flip: true },
       { name: 'eel_body',   w: CONFIG.EEL.BODY_W,   h: CONFIG.EEL.BODY_H },
@@ -91,6 +93,7 @@ const Game = (() => {
     Nest.reset();
     Hydra.reset();
     Maw.reset();
+    Crusher.reset();
     Eel.reset();
     _elapsed = 0;
     running = true;
@@ -294,6 +297,7 @@ const Game = (() => {
     Nest.update(depth, aheadDepth, PX_PER_M, dt);
     Hydra.update(depth, aheadDepth, PX_PER_M, dt);
     Maw.update(depth, aheadDepth, PX_PER_M, dt);
+    Crusher.update(depth, aheadDepth, PX_PER_M, dt);
     const droneDepthNow = depth + (CONFIG.DRONE_Y / PX_PER_M);
     // Угрю нужны дрон и скорость падения: он бьёт по месту и подгадывает
     // момент под подход, а не живёт по своему секундомеру
@@ -337,6 +341,9 @@ const Game = (() => {
       // Пасть: пуля в зубы гаснет, в отверстие пролетает. Сама пасть не умирает.
       const hm = Maw.shootAt(sh.x, sh.depth, PX_PER_M);
       if (hm) { _spark(hm.x, hm.y, '#ffb070'); sh.dead = true; continue; }
+      // Броненосец неубиваем: пуля гаснет о броню, урона нет
+      const hc = Crusher.shootAt(sh.x, sh.depth, PX_PER_M);
+      if (hc) { _spark(hc.x, hc.y, '#9aa4ad'); sh.dead = true; continue; }
       const he = Eel.shootAt(sh.x, sh.depth, PX_PER_M, _elapsed);
       if (he) {
         _spark(he.x, he.y, he.kind === 'eye' ? '#ff6a4a' : '#cfe8ff');
@@ -395,6 +402,9 @@ const Game = (() => {
     // Пасть. Зубы сходятся к центру: за пределами отверстия дрон погибает.
     // Щит спасает так же, как от гидры — тварь не убивается.
     if (Maw.hitTest(Drone.x, droneDepth, PX_PER_M) && shieldTime <= 0) _crash('eaten');
+
+    // Броненосец. Таран челюстью и корпус смертельны, щит спасает как от гидры.
+    if (Crusher.hitTest(Drone.x, droneDepth, PX_PER_M) && shieldTime <= 0) _crash('eaten');
 
     // Угорь. Щит спасает так же, как от гнезда: тварь не расстреливается
     // и никуда не девается, выталкиваться игроку придётся самому.
@@ -696,6 +706,7 @@ const Game = (() => {
     Nest.draw(ctx, depth, PX_PER_M, _elapsed);
     Hydra.draw(ctx, depth, PX_PER_M);
     Maw.draw(ctx, depth, PX_PER_M);
+    Crusher.draw(ctx, depth, PX_PER_M);
     Eel.draw(ctx, depth, PX_PER_M, _elapsed);
     Swarm.draw(ctx, depth, PX_PER_M, _elapsed);
 
