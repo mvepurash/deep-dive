@@ -1,5 +1,5 @@
-# Вырезает магенту (#FF00FF) из исходника гребня титана. Кадр 720x720, без
-# обрезки, чтобы масштаб относительно других фрагментов сохранялся.
+# Вырезает магенту (#FF00FF) из исходников титана: гребень, глаз, край туши.
+# Каждый кадр 720x720 без обрезки, чтобы масштаб фрагментов сохранялся.
 # Запуск из корня репозитория: python3 tools/key_titan.py
 import os
 import numpy as np
@@ -29,8 +29,9 @@ def key(path):
     return out.clip(0, 255).astype(np.uint8)
 
 
-rgba = key(SRC + 'titan_crest_src.png')
-img = Image.fromarray(rgba, 'RGBA').resize((S_OUT, S_OUT), Image.LANCZOS)
-img.save(OUT + 'titan_crest.webp', 'WEBP', quality=92)
-ys, xs = np.where(np.asarray(img)[..., 3] > 8)
-print('crest content box x', xs.min(), xs.max(), 'y', ys.min(), ys.max(), 'frame', S_OUT)
+for name in ['crest', 'eye', 'edge']:
+    rgba = key(SRC + f'titan_{name}_src.png')
+    img = Image.fromarray(rgba, 'RGBA').resize((S_OUT, S_OUT), Image.LANCZOS)
+    img.save(OUT + f'titan_{name}.webp', 'WEBP', quality=92)
+    ys, xs = np.where(np.asarray(img)[..., 3] > 8)
+    print(name, 'content box x', xs.min(), xs.max(), 'y', ys.min(), ys.max(), 'frame', S_OUT)
