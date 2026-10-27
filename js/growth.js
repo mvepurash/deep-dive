@@ -69,6 +69,7 @@ const Growth = (() => {
     if (typeof Hydra !== 'undefined' && Hydra.covers(depth, side)) return 0;
     if (typeof Maw !== 'undefined' && Maw.covers(depth, side)) return 0;
     if (typeof Crusher !== 'undefined' && Crusher.covers(depth, side)) return 0;
+    if (typeof Titan !== 'undefined' && Titan.covers(depth, side)) return 0;
 
     // На норе угря — тем более. Единственное предупреждение, которое есть
     // у игрока, — это светящийся глаз в устье. Коралл поверх норы его

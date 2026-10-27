@@ -56,6 +56,9 @@ const Game = (() => {
       { name: 'maw_closed',   w: CONFIG.MAW.W_PX,   h: CONFIG.MAW.H_PX },
       { name: 'crusher_body', w: CONFIG.CRUSHER.FRAME_PX, h: CONFIG.CRUSHER.FRAME_PX },
       { name: 'crusher_jaw',  w: CONFIG.CRUSHER.FRAME_PX * CONFIG.CRUSHER.JAW_SCALE, h: CONFIG.CRUSHER.FRAME_PX * CONFIG.CRUSHER.JAW_SCALE },
+      { name: 'titan_crest', w: CONFIG.TITAN.FRAME_PX, h: CONFIG.TITAN.FRAME_PX },
+      { name: 'titan_eye',   w: CONFIG.TITAN.FRAME_PX, h: CONFIG.TITAN.FRAME_PX },
+      { name: 'titan_edge',  w: CONFIG.TITAN.FRAME_PX, h: CONFIG.TITAN.FRAME_PX },
       { name: 'eel_burrow', w: CONFIG.EEL.BURROW_W, h: CONFIG.EEL.BURROW_H },
       { name: 'eel_burrow', w: CONFIG.EEL.BURROW_W, h: CONFIG.EEL.BURROW_H, flip: true },
       { name: 'eel_body',   w: CONFIG.EEL.BODY_W,   h: CONFIG.EEL.BODY_H },
@@ -94,6 +97,7 @@ const Game = (() => {
     Hydra.reset();
     Maw.reset();
     Crusher.reset();
+    Titan.reset();
     Eel.reset();
     _elapsed = 0;
     running = true;
@@ -298,6 +302,7 @@ const Game = (() => {
     Hydra.update(depth, aheadDepth, PX_PER_M, dt);
     Maw.update(depth, aheadDepth, PX_PER_M, dt);
     Crusher.update(depth, aheadDepth, PX_PER_M, dt);
+    Titan.update(depth, aheadDepth, PX_PER_M, dt);
     const droneDepthNow = depth + (CONFIG.DRONE_Y / PX_PER_M);
     // Угрю нужны дрон и скорость падения: он бьёт по месту и подгадывает
     // момент под подход, а не живёт по своему секундомеру
@@ -344,6 +349,9 @@ const Game = (() => {
       // Броненосец неубиваем: пуля гаснет о броню, урона нет
       const hc = Crusher.shootAt(sh.x, sh.depth, PX_PER_M);
       if (hc) { _spark(hc.x, hc.y, '#9aa4ad'); sh.dead = true; continue; }
+      // Титан: туша гасит пулю без урона, щель пропускает
+      const ht = Titan.shootAt(sh.x, sh.depth, PX_PER_M);
+      if (ht) { _spark(ht.x, ht.y, '#b0a48e'); sh.dead = true; continue; }
       const he = Eel.shootAt(sh.x, sh.depth, PX_PER_M, _elapsed);
       if (he) {
         _spark(he.x, he.y, he.kind === 'eye' ? '#ff6a4a' : '#cfe8ff');
@@ -405,6 +413,9 @@ const Game = (() => {
 
     // Броненосец. Таран челюстью и корпус смертельны, щит спасает как от гидры.
     if (Crusher.hitTest(Drone.x, droneDepth, PX_PER_M) && shieldTime <= 0) _crash('eaten');
+
+    // Титан. Касание смертельно, щит его не пробивает (ТЗ, раздел 7, правило 3).
+    if (Titan.hitTest(Drone.x, droneDepth, PX_PER_M)) _crash('eaten');
 
     // Угорь. Щит спасает так же, как от гнезда: тварь не расстреливается
     // и никуда не девается, выталкиваться игроку придётся самому.
@@ -707,6 +718,7 @@ const Game = (() => {
     Hydra.draw(ctx, depth, PX_PER_M);
     Maw.draw(ctx, depth, PX_PER_M);
     Crusher.draw(ctx, depth, PX_PER_M);
+    Titan.draw(ctx, depth, PX_PER_M);
     Eel.draw(ctx, depth, PX_PER_M, _elapsed);
     Swarm.draw(ctx, depth, PX_PER_M, _elapsed);
 
